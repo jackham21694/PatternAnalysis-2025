@@ -30,13 +30,17 @@ def data_loader(path):
     # 1000 sequences of length 50
     sample_data = raw_data[:50000]
     shaped_sample_data = sample_data.reshape((1000, 50, 20))
+    normalised = normalise_min_max(shaped_sample_data)
 
     # Convert to 3D tensor of the form [num_sequences, sequence_length, num_features]
-    return tf.convert_to_tensor(shaped_sample_data, dtype=tf.float32)
+    return tf.convert_to_tensor(normalised, dtype=tf.float32)
 
 
-def normalise():
-    return None
+def normalise_min_max(data):
+    numerator = data - np.min(data, 0)
+    denominator = np.max(data, 0) - np.min(data, 0)
+    norm_data = numerator / (denominator + 1e-7)
+    return norm_data
 
 
 data = data_loader("C:/Users/Jack Ham/OneDrive/2025 - Sem 2/COMP3710/lobsterDepth5/AMZN_2012-06-21_34200000_57600000_orderbook_5.csv")
