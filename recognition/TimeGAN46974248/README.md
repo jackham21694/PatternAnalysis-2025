@@ -27,3 +27,8 @@ Include the following details in your report:
 - Short error analysis paragraph discussing where the synthetic LOBs succeed and fail
 
 
+## Current Dependencies Required:
+
+- numpy
+- tensorflow
+- scikit-learn 
