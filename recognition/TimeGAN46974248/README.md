@@ -32,3 +32,9 @@ Include the following details in your report:
 - numpy
 - tensorflow
 - scikit-learn 
+
+
+
+## References
+https://numpy.org/doc
+https://www.tensorflow.org/api_docs/
