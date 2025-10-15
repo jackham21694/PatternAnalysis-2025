@@ -38,3 +38,11 @@ Include the following details in your report:
 ## References
 https://numpy.org/doc
 https://www.tensorflow.org/api_docs/
+https://proceedings.neurips.cc/paper_files/paper/2019/file/c9efe5f26cd17ba6216bbe2a7d26d490-Paper.pdf
+https://github.com/jsyoon0823/TimeGAN
+https://lobsterdata.com/info/DataSamples.php
+https://ydata.ai/resources/synthetic-time-series-data-a-gan-approach
+https://notes.yeshiwei.com/_downloads/2ce792aff8596ea9453a9714f39d957a/Machine_Learning_for_Algorithmic_Trading_Predictive.pdf
+https://github.com/stefan-jansen/machine-learning-for-trading/tree/main
+https://repository.lib.fsu.edu/islandora/object/fsu:770676
+https://bechirtr97.medium.com/enhancing-timegan-with-language-model-architectures-autoregressive-transformers-and-positional-bc6a7024e047
