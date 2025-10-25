@@ -3,6 +3,8 @@ Contains the source code of the components of your model. Each component will be
 
 """
 
+from dataset import data_loader
+
 from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.layers import GRU, Dense, Input
 from tensorflow.keras.optimizers import Adam

@@ -46,3 +46,4 @@ https://notes.yeshiwei.com/_downloads/2ce792aff8596ea9453a9714f39d957a/Machine_L
 https://github.com/stefan-jansen/machine-learning-for-trading/tree/main
 https://repository.lib.fsu.edu/islandora/object/fsu:770676
 https://bechirtr97.medium.com/enhancing-timegan-with-language-model-architectures-autoregressive-transformers-and-positional-bc6a7024e047
+https://www.jpmorgan.com/content/dam/jpm/cib/complex/content/technology/ai-research-publications/pdf-12.pdf
