@@ -3,93 +3,36 @@ Contains the source code of the components of your model. Each component will be
 
 """
 
-from dataset import data_loader
-
-from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.layers import GRU, Dense, Input
-from tensorflow.keras.optimizers import Adam
+import tensorflow as tf
+from utils import rnn_cell
 
 
 
+num_layers = 3 # Almost every paper
+hidden_dim = 8 # Since we only have 20 data features
+num_features = 20 # See dataset.py
+seq_len = 50 # See dataset.py
 
+X = tf.placeholder(tf.float32, [None, seq_len, num_features], name="RealData")
 
-def make_rnn(model, n_layers, hidden_units, output_units):
-    for i in range(n_layers): 
-        model.add(GRU(units=hidden_units,
-                    return_sequences=True,
-                    name=f'GRU_{i + 1}'))
-    model.add(Dense(units=output_units,
-                    activation = 'sigmoid',
-                    name='OUT'))
-    return model
+def embedder (X, T):
+    # Groups all the GRU and Fully Connected Layer Weights and Biases with the prefix of 'embedder'
+    with tf.variable_scope("embedder", reuse=tf.AUTO_REUSE):
 
+        # Defining a GRU cell with hidden_dim amount of units, we have 3 layers of GRU, which is then combined into
+        # one layer using MultiRNNCell. So the hidden vectors in the first layer will be used as input to the next layer
+        # so we can better map the more complex features of the data. The way GRU works is that it will start with a vector
+        # of zeroes of dimension [1 x hidden_dim], it will take the first input/timestep which is [1 x num_features] and
+        # the GRU will use it gates and update this vector, and update the vector. This is repeated for all 50 sequences and
+        # we will have [50x8]. This process is repeated two more times since we are asking for 3 layers.
+        e_cell = tf.nn.rnn_cell.MultiRNNCell([rnn_cell('gru', hidden_dim) for _ in range(num_layers)])
+        
+        # Uses the multi-cell GRU we just created to output the hidden state/vector at each timestep (timestep = 1x8), the second output we do not care about
+        # So our final output will be [50x8] each sequence represented by a vector of length 8 instead of 20.
+        e_outputs, e_last_states = tf.nn.dynamic_rnn(e_cell, X, dtype=tf.float32, sequence_length=T)
 
-class Supervisor(Model):
-    def __init__(self, hidden_dim):
-        self.hidden_dim = hidden_dim
-
-    def build(self, input_shape):
-        model = Sequential(name='Supervisor')
-        model.add(Input(shape=input_shape))
-        model = make_rnn(model, 
-                         n_layers=2, 
-                         hidden_units = self.hidden_dim, 
-                         output_units = self.hidden_dim)
-
-        return model
-
-
-class Generator(Model):
-    def __init__(self, hidden_dim):
-        self.hidden_dim = hidden_dim
-
-    def build(self, input_shape):
-        model = Sequential(name='Generator')
-        model.add(Input(shape=input_shape))
-        model = make_rnn(model,
-                         n_layers=3,
-                         hidden_units=self.hidden_dim,
-                         output_units=self.hidden_dim)
-        return model
-
-class Discriminator(Model):
-    def __init__(self, hidden_dim):
-        self.hidden_dim = hidden_dim
-
-    def build(self, input_shape):
-        model = Sequential(name='Discriminator')
-        model = make_rnn(model,
-                         n_layers=3,
-                         hidden_units=self.hidden_dim,
-                         output_units=1)
-        return model
-
-class Recovery(Model):
-    def __init__(self, hidden_dim, n_seq):
-        self.hidden_dim=hidden_dim
-        self.n_seq=n_seq
-        return
-
-    def build(self, input_shape):
-        recovery = Sequential(name='Recovery')
-        recovery.add(Input(shape=input_shape, name='EmbeddedData'))
-        recovery = make_rnn(recovery,
-                            n_layers=3,
-                            hidden_units=self.hidden_dim,
-                            output_units=self.n_seq)
-        return recovery
-
-class Embedder(Model):
-
-    def __init__(self, hidden_dim):
-        self.hidden_dim=hidden_dim
-        return
-
-    def build(self, input_shape):
-        embedder = Sequential(name='Embedder')
-        embedder.add(Input(shape=input_shape, name='Data'))
-        embedder = make_rnn(embedder,
-                            n_layers=3,
-                            hidden_units=self.hidden_dim,
-                            output_units=self.hidden_dim)
-        return embedder
+        # Takes each hidden vector and maps it to latent space. Note that the input and output dimension are actually the same, so 
+        # we are not really reducing the input_dimensions at all. The GRU vectors only considered the previous timestep (along with the feedback loop)
+        # and so the fully connected layer aims to combine all these features linearly, to give a more realistic latent space.
+        H = tf.contrib.layers.fully_connected(e_outputs, hidden_dim, activation_fn=tf.nn.sigmoid)
+        return H
