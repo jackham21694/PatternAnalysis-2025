@@ -8,12 +8,7 @@ from utils import rnn_cell
 
 
 
-num_layers = 3 # Almost every paper
-hidden_dim = 8 # Since we only have 20 data features
-num_features = 20 # See dataset.py
-seq_len = 50 # See dataset.py
 
-X = tf.placeholder(tf.float32, [None, seq_len, num_features], name="RealData")
 
 def embedder (X, T):
     # Groups all the GRU and Fully Connected Layer Weights and Biases with the prefix of 'embedder'
@@ -36,3 +31,22 @@ def embedder (X, T):
         # and so the fully connected layer aims to combine all these features linearly, to give a more realistic latent space.
         H = tf.contrib.layers.fully_connected(e_outputs, hidden_dim, activation_fn=tf.nn.sigmoid)
         return H
+
+"""
+Takes the latent representation and maps it back to time series format
+"""
+def recovery (H, T):      
+
+    # Groups al the GRU and Fully Connceted Layer Weights and Biases with the prefix 'recovery'
+    with tf.variable_scope("recovery", reuse = tf.AUTO_REUSE):       
+      
+      # Creating the exact same 3-layer GRU network as the embedder this time not changing dimensionality.
+      r_cell = tf.nn.rnn_cell.MultiRNNCell([rnn_cell('gru', hidden_dim) for _ in range(num_layers)])
+
+      # So our final output will still be [50x8]
+      r_outputs, r_last_states = tf.nn.dynamic_rnn(r_cell, H, dtype=tf.float32, sequence_length = T)
+      
+      # This time we do our dimensionality reduction in the fully connected-layer where we go from 
+      # [50x8] back to [50x20]
+      X_tilde = tf.contrib.layers.fully_connected(r_outputs, num_features, activation_fn=tf.nn.sigmoid) 
+    return X_tilde
