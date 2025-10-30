@@ -13,14 +13,14 @@ from modules import Autoencoder
 #Evaluating our trained autoencoder (uses checkpoint weights from colab code)
 
 num_layers = 3 # Almost every paper
-hidden_dim = 8 # Since we only have 20 data features
+hidden_dim = 16 # Since we only have 20 data features
 num_features = 20 # See dataset.py
 
 model = Autoencoder(hidden_dim, num_layers, num_features)
-optimizer = tf.keras.optimizers.Adam()
+
 
 checkpoint_path = "/content/drive/MyDrive/TimeGANWork/checkpoints/autoencoder"
-ckpt = tf.train.Checkpoint(model=model, optimizer=optimizer)
+ckpt = tf.train.Checkpoint(model=model)
 manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=3)
 
 if manager.latest_checkpoint:
@@ -43,11 +43,8 @@ mse_loss = tf.keras.losses.MeanSquaredError()
 loss = mse_loss(X_eval, X_reconstructed)
 print("Reconstruction loss on evaluation set:", loss.numpy())
 
-#Visualisation
-sample_idx = 0  # pick first sequence
-plt.figure(figsize=(12,4))
-plt.plot(X_eval[sample_idx,:,0], label="Original feature 0")
-plt.plot(X_reconstructed[sample_idx,:,0], label="Reconstructed feature 0", linestyle='--')
-plt.title("Autoencoder reconstruction (feature 0)")
-plt.legend()
-plt.show()
+# Use our trained model to reconstruct our training dataset
+X_train_reconstructed = model(X_train)
+mse_loss_train = tf.keras.losses.MeanSquaredError()
+loss_train = mse_loss_train(X_train, X_train_reconstructed)
+print("Reconstruction loss on training set:", loss_train.numpy())

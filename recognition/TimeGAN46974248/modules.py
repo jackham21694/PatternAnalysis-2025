@@ -4,6 +4,7 @@ Contains the source code of the components of your model. Each component will be
 """
 
 import tensorflow as tf
+import numpy as np
 
 def embedder (X, T, hidden_dim, num_layers):
     rnn_cell = tf.nn.rnn_cell.GRUCell(num_units=hidden_dim, activation=tf.nn.tanh)
@@ -73,7 +74,7 @@ class Autoencoder(tf.keras.Model):
                                     name=f"embedder_gru_{i}")
             )
         self.embedder_dense = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.Dense(hidden_dim, activation='sigmoid')
+            tf.keras.layers.Dense(hidden_dim, activation=None)
         )
 
         # Build recovery layers
@@ -85,7 +86,7 @@ class Autoencoder(tf.keras.Model):
                                     name=f"recovery_gru_{i}")
             )
         self.recovery_dense = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.Dense(num_features, activation='sigmoid')
+            tf.keras.layers.Dense(num_features, activation=None)
         )
 
     def call(self, X):

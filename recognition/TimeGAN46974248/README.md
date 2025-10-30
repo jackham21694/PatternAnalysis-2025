@@ -39,3 +39,4 @@ https://repository.lib.fsu.edu/islandora/object/fsu:770676
 https://bechirtr97.medium.com/enhancing-timegan-with-language-model-architectures-autoregressive-transformers-and-positional-bc6a7024e047
 https://www.jpmorgan.com/content/dam/jpm/cib/complex/content/technology/ai-research-publications/pdf-12.pdf
 https://www.tensorflow.org/guide/migrate#migrate-from-tensorflow-1x-to-tensorflow-2
+https://github.com/Jeonghwan-Cheon/lob-deep-learning
