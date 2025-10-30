@@ -4,13 +4,9 @@ Contains the source code of the components of your model. Each component will be
 """
 
 import tensorflow as tf
-from utils import rnn_cell
 
-
-
-
-
-def embedder (X, T):
+def embedder (X, T, hidden_dim, num_layers):
+    rnn_cell = tf.nn.rnn_cell.GRUCell(num_units=hidden_dim, activation=tf.nn.tanh)
     # Groups all the GRU and Fully Connected Layer Weights and Biases with the prefix of 'embedder'
     with tf.variable_scope("embedder", reuse=tf.AUTO_REUSE):
 
@@ -35,8 +31,8 @@ def embedder (X, T):
 """
 Takes the latent representation and maps it back to time series format
 """
-def recovery (H, T):      
-
+def recovery (H, T, hidden_dim, num_layers, num_features):      
+    rnn_cell = tf.nn.rnn_cell.GRUCell(num_units=hidden_dim, activation=tf.nn.tanh)
     # Groups al the GRU and Fully Connceted Layer Weights and Biases with the prefix 'recovery'
     with tf.variable_scope("recovery", reuse = tf.AUTO_REUSE):       
       
@@ -50,3 +46,62 @@ def recovery (H, T):
       # [50x8] back to [50x20]
       X_tilde = tf.contrib.layers.fully_connected(r_outputs, num_features, activation_fn=tf.nn.sigmoid) 
     return X_tilde
+
+
+#------------------------------------------Tensorflow2 Version with AutoEncoder Class ----------------------------------------------
+
+def batch_generator(data, time, batch_size):
+    no = len(data)
+    idx = np.random.permutation(no)[:batch_size]
+    X_mb = np.array([data[i] for i in idx], dtype=np.float32)
+    T_mb = np.array([time[i] for i in idx], dtype=np.int32)
+    return X_mb, T_mb
+
+class Autoencoder(tf.keras.Model):
+    def __init__(self, hidden_dim, num_layers, num_features):
+        super(Autoencoder, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.num_features = num_features
+
+        # Build embedder layers
+        self.embedder_grus = []
+        for i in range(num_layers):
+            self.embedder_grus.append(
+                tf.keras.layers.GRU(hidden_dim, activation='tanh',
+                                    return_sequences=True,
+                                    name=f"embedder_gru_{i}")
+            )
+        self.embedder_dense = tf.keras.layers.TimeDistributed(
+            tf.keras.layers.Dense(hidden_dim, activation='sigmoid')
+        )
+
+        # Build recovery layers
+        self.recovery_grus = []
+        for i in range(num_layers):
+            self.recovery_grus.append(
+                tf.keras.layers.GRU(hidden_dim, activation='tanh',
+                                    return_sequences=True,
+                                    name=f"recovery_gru_{i}")
+            )
+        self.recovery_dense = tf.keras.layers.TimeDistributed(
+            tf.keras.layers.Dense(num_features, activation='sigmoid')
+        )
+
+    def call(self, X):
+        # Embedder
+        H = X
+        for gru in self.embedder_grus:
+            H = gru(H)
+        H = self.embedder_dense(H)
+
+        # Recovery
+        R = H
+        for gru in self.recovery_grus:
+            R = gru(R)
+        X_tilde = self.recovery_dense(R)
+
+        return X_tilde
+
+
+

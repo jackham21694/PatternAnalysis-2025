@@ -4,68 +4,61 @@ imported from 'modules.py' and the data loader imported from 'dataset.py'. Make 
 losses and metrics during training. 
 
 """
-from utils import batch_generator
 from dataset import data_loader
-from modules import embedder, recovery
-import tensorflow as tf
+from modules import Autoencoder, batch_generator
 import numpy as np
 
-data = data_loader("C:/Users/Jack Ham/OneDrive/2025 - Sem 2/COMP3710/lobsterDepth5/AMZN_2012-06-21_34200000_57600000_orderbook_5.csv")
+file_path = '/content/drive/MyDrive/TimeGANWork/AMZN_2012-06-21_34200000_57600000_orderbook_5.csv'
+data = data_loader(file_path).numpy()
 
-# Training autoencoder
+# Define our hyperparamters
 num_layers = 3 # Almost every paper
 hidden_dim = 8 # Since we only have 20 data features
 num_features = 20 # See dataset.py
 seq_len = 50 # See dataset.py
 
-training_iterations = 50000
+training_iterations = 5000
 batch_size = 124
 
-# These placeholders essentially help tensorflow structure the computational graph, and knows what
-# input to expect
-# The NONE's are the batch size that will be inputted layer during the training processes
-X = tf.placeholder(tf.float32, [None, seq_len, num_features], name="RealData")
-T = tf.placeholder(tf.int32, [None], name = "myinput_t")
+#---------------------------AUTOENCODER TRAINING--------------------------------
+model = Autoencoder(hidden_dim, num_layers, num_features)
+optimizer = tf.keras.optimizers.Adam()
+mse_loss = tf.keras.losses.MeanSquaredError()
+print(mse_loss)
+
+# Saving weights in Colab
+checkpoint_path = "/content/drive/MyDrive/TimeGANWork/checkpoints/autoencoder"
+ckpt = tf.train.Checkpoint(model=model, optimizer=optimizer)
+manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=3)
+
+print("Start Embedding Network Training")
+
+# Checking if a checkpoint exists
+if manager.latest_checkpoint:
+    ckpt.restore(manager.latest_checkpoint)
+    print(f"Restored from {manager.latest_checkpoint}")
+else:
+    print("Initializing from scratch")
 
 
 
-H = embedder(X)
-X_tilde = recovery(H)
-
-# Embedder and Recovery Variables that we saved earlier
-e_vars = [v for v in tf.trainable_variables() if v.name.startswith('embedder')]
-r_vars = [v for v in tf.trainable_variables() if v.name.startswith('recovery')]
-
-
-# Autoencoder Network Loss, note first we are not considering supervised loss
-# Original paper makes this additional numerical adjustment
-E_loss_T0 = tf.losses.mean_squared_error(X, X_tilde)
-E_loss = 10*tf.sqrt(E_loss_T0)
-
-
-# Defining our optimiser
-E_solver = tf.train.AdamOptimizer().minimize(E_loss, var_list = e_vars + r_vars)
-
-## TimeGAN training   
-sess = tf.Session()
-sess.run(tf.global_variables_initializer())
-    
-# 1. Embedding network training
-print('Start Embedding Network Training')
-    
 for itt in range(training_iterations):
-    # All of our sequences are of equal length, so the second variable we just parse a list of [50, 50, 50, ...]
-    # Also note they way we are batching here means we will get duplicate values and not see everything probably
-    # depending on the number of iterations, which kind of represents epochs but more random.
-    X_mb, T_mb = batch_generator(data, [seq_len]*1000, batch_size)           
-    
-    # Singular training step, using the optimiser and loss function with our mini-batch, and we get our step loss       
-    _, step_e_loss = sess.run([E_solver, E_loss_T0], feed_dict={X: X_mb, T: T_mb})        
-    # Check loss every thousand interations
-    if itt % 1000 == 0:
-        print('step: '+ str(itt) + '/' + str(training_iterations) + ', e_loss: ' + str(np.round(np.sqrt(step_e_loss),4)) ) 
+    X_mb, _ = batch_generator(data, [seq_len]*len(data), batch_size)
+    X_mb = np.array(X_mb, dtype=np.float32)
 
-print('Finish Embedding Network Training')
+    with tf.GradientTape() as tape:
+        # Ensure the model call and loss calculation are within the tape context
+        X_tilde = model(X_mb)
+        loss = 10.0 * tf.sqrt(mse_loss(X_mb, X_tilde))  # same as original scaling
+
+    gradients = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+    if itt % 500 == 0:
+        print(f"step: {itt}/{training_iterations}, e_loss: {loss.numpy():.4f}")
+        manager.save()  # Save checkpoint every 1000 steps
+
+print("Finish Embedding Network Training")
 
 
 

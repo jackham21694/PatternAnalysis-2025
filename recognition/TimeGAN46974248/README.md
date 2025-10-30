@@ -1,30 +1,21 @@
-# Generative Time-Series Model for LOB Data
+## Financial Data Generation using TimeGAN
 
-Train a generative time-series model, such as **TimeGAN**, to generate synthetic sequences of **limit order book (LOB)** events using the **LOBSTER dataset** (use AMZN level 10 data).  
+## Overview
+Generative Adverarial Networks have emerged as one of the more popular machine learning frameworks in recent years, given
+the increasing desire for generative AI, and synthetic data producttion. Popular networks such as the StyleGAN and widely reknowned
+transformers such as ChatGPT have taken the world by storm, but both have unique weakness when it comes to handling time-series data.
+Traditional GAN cannot capture the temporal dyamics of time-series data, and transformers are purely deterministic, not built for syntethic data generation. In 2020 a new model entered the atmosphere known as the TimeGAN, designed for synthetic data generation, focusing on
+temporal data dynamics, through the addition of supervised losses.
 
-## Evaluation Metrics
 
-Evaluate the generated sequences on a held-out test split using the following metrics:
 
-- **Distribution similarity**:  
-  KL divergence ≤ 0.1 between the generated and real spread and midprice return distributions.
 
-- **Visual similarity**:  
-  SSIM > 0.6 between heatmaps of generated vs real LOB depth snapshots.
 
-## Report Requirements
 
-Include the following details in your report:
 
-- Model architecture and parameter count
-- Training strategy:
-  - Full model
-  - Variants (e.g., adversarial-only or supervised-only losses)
-- GPU type and VRAM
-- Number of epochs
-- Total training time
-- 3–5 representative heatmap visualizations comparing generated vs real order books
-- Short error analysis paragraph discussing where the synthetic LOBs succeed and fail
+
+
+
 
 
 ## Current Dependencies Required:
@@ -47,3 +38,4 @@ https://github.com/stefan-jansen/machine-learning-for-trading/tree/main
 https://repository.lib.fsu.edu/islandora/object/fsu:770676
 https://bechirtr97.medium.com/enhancing-timegan-with-language-model-architectures-autoregressive-transformers-and-positional-bc6a7024e047
 https://www.jpmorgan.com/content/dam/jpm/cib/complex/content/technology/ai-research-publications/pdf-12.pdf
+https://www.tensorflow.org/guide/migrate#migrate-from-tensorflow-1x-to-tensorflow-2
