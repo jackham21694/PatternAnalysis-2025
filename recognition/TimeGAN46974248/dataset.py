@@ -24,17 +24,32 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-def data_loader(path):
-    raw_data = np.loadtxt(path, delimiter=',') # shape will be (entries) x (depth x 4)
+def data_loader(path, num_features=20):
+    # shape will be (entries) x (depth x 4)
+    raw_data = np.loadtxt(path, delimiter=',') 
 
-    # Initially we only want to consider a small amount of the dataset, Here we are looking for 
-    # 1000 sequences of length 50
-    sample_data = raw_data[:50000]
-    shaped_sample_data = sample_data.reshape((1000, 50, 20))
+    # We choose a sequence length of 50, leave out 35 timesteps at the end
+    num_sequences = raw_data.shape[0] // 50 
+    total_timesteps = num_sequences * 50
 
+    # Discard the 35 letfover timesteps (35 for our lobster depth 5 data)
+    trimmed_data = raw_data[:total_timesteps]
+    shaped_sample_data = trimmed_data.reshape((num_sequences, 50, num_features))
     normalised = normalise_min_max(shaped_sample_data)
+
+    # Shuffle and prepare train, eval, test datasets
+    np.random.seed(46974248)
+    np.random.shuffle(normalised)
+
+    train = normalised[:int(0.7*num_sequences)]
+    eval  = normalised[:int(0.1*num_sequences)]
+    test  = normalised[:int(0.2*num_sequences)]
+
+
     # Convert to 3D tensor of the form [num_sequences, sequence_length, num_features]
-    return tf.convert_to_tensor(normalised, dtype=tf.float32)
+    return (tf.convert_to_tensor(train, dtype=tf.float32),
+            tf.convert_to_tensor(eval, dtype=tf.float32),
+            tf.convert_to_tensor(test, dtype=tf.float32))
 
 
 def normalise_min_max(data):
