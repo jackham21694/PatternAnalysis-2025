@@ -10,15 +10,6 @@ import numpy as np
 import tensorflow as tf
 import os
 
-# Saving weights in Colab
-checkpoint_path = "/content/drive/MyDrive/TimeGANWork/checkpoints/autoencoder"
-
-# Create the directory if it doesn't exist
-if not os.path.exists(checkpoint_path):
-    os.makedirs(checkpoint_path)
-    print(f"Created directory: {checkpoint_path}")
-
-
 
 file_path = '/content/drive/MyDrive/TimeGANWork/AMZN_2012-06-21_34200000_57600000_orderbook_5.csv'
 X_train, X_eval, X_test = data_loader(file_path)
@@ -28,12 +19,12 @@ X_test = X_test.numpy()
 
 
 # Define our hyperparamters
-num_layers = 3 # Almost every paper
-hidden_dim = 64 # Changed for experimental purposes, was not capturing midprice well
+num_layers = 2 # Almost every paper
+hidden_dim = 16 # Changed for experimental purposes, was not capturing midprice well
 num_features = 20 # See dataset.py
 seq_len = 50 # See dataset.py
 
-training_iterations = 8000
+training_iterations = 10000
 batch_size = 64
 
 
@@ -52,19 +43,7 @@ optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 mse_loss = tf.keras.losses.MeanSquaredError()
 print(mse_loss)
 
-ckpt = tf.train.Checkpoint(model=model, optimizer=optimizer)
-manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=3)
-
 print("Start Embedding Network Training")
-
-# Checking if a checkpoint exists
-start_fresh = True
-if not start_fresh and manager.latest_checkpoint:
-    ckpt.restore(manager.latest_checkpoint)
-    print(f"Restored from {manager.latest_checkpoint}")
-else:
-    print("Initializing from scratch")
-
 
 
 for itt in range(training_iterations):
@@ -103,7 +82,6 @@ for itt in range(training_iterations):
 
     if itt % 100 == 0:
         print(f"step: {itt}/{training_iterations}, e_loss: {loss.numpy():.6f}")
-        manager.save()  # Save checkpoint every 100 steps or as desired
 
 print("Finish Embedding Network Training")
 

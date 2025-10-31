@@ -53,27 +53,30 @@ def data_loader(path, num_features=20):
     price_idx = ask_prices_idx + bid_prices_idx
     volume_idx = ask_volumes_idx + bid_volumes_idx
 
-    # Concatenate our train and validation sets (we use statistics for the 
+    # Concatenate our train and validation sets (we use statistics for the
     # joint set)
     train_val = np.vstack([train.reshape(-1, num_features),
                            val.reshape(-1, num_features)])
 
-    # Price (small offset to avoid zero division)
-    price_mean = train_val[:, price_idx].mean(axis=0, keepdims=True)
-    price_std  = train_val[:, price_idx].std(axis=0, keepdims=True) + 1e-8
+
+    # Price (we use min-max scaling here)
+    price_min = train_val[:, price_idx].min(axis=0, keepdims=True)
+    price_max = train_val[:, price_idx].max(axis=0, keepdims=True)
+
 
     # Volume (small offset to avoid zero division)
     volume_mean = train_val[:, volume_idx].mean(axis=0, keepdims=True)
     volume_std  = train_val[:, volume_idx].std(axis=0, keepdims=True) + 1e-8
 
-
-    # Applied z-score normalisation
+    # Applied z-score normalisation for volume, and min-max for prices
     def normalise(data):
-        # Get rid of sequences so we can deal with each timestep
+        # Flatten sequences (get rid of) so we can deal with each timestep
         data_flat = data.reshape(-1, num_features)
-        
-        #Normalise prices and volumes seperately
-        data_flat[:, price_idx]  = (data_flat[:, price_idx] - price_mean) / price_std
+
+        #Normalise prices, volumes seperately
+
+        data_flat[:, price_idx] = 2.0 * ((data_flat[:, price_idx] - price_min) /
+                                         (price_max - price_min + 1e-8)) - 1.0
         data_flat[:, volume_idx] = (data_flat[:, volume_idx] - volume_mean) / volume_std
         return data_flat.reshape(data.shape)
 
@@ -85,7 +88,7 @@ def data_loader(path, num_features=20):
     return (tf.convert_to_tensor(train_norm, dtype=tf.float32),
             tf.convert_to_tensor(val_norm, dtype=tf.float32),
             tf.convert_to_tensor(test_norm, dtype=tf.float32),
-            price_mean, price_std, 
+            price_min, price_max,
             volume_mean, volume_std)
 
 

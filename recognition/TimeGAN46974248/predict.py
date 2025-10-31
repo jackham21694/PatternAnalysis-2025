@@ -19,17 +19,6 @@ num_features = 20 # See dataset.py
 
 model = Autoencoder(hidden_dim, num_layers, num_features)
 
-checkpoint_path = "/content/drive/MyDrive/TimeGANWork/checkpoints/autoencoder"
-ckpt = tf.train.Checkpoint(model=model)
-manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=3)
-
-if manager.latest_checkpoint:
-    ckpt.restore(manager.latest_checkpoint)
-    print("Restored trained Autoencoder from")
-else:
-    raise ValueError("No checkpoint found. Check the path!")
-
-
 # Load Evaluation Dataset
 file_path = '/content/drive/MyDrive/TimeGANWork/AMZN_2012-06-21_34200000_57600000_orderbook_5.csv'
 X_train, X_eval, X_test, price_mean, price_std, volume_mean, volume_std = data_loader(file_path)
