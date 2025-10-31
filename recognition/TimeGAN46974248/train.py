@@ -29,21 +29,20 @@ X_test = X_test.numpy()
 
 # Define our hyperparamters
 num_layers = 3 # Almost every paper
-hidden_dim = 16 # Increase the number of hidden dimensions to incorporate complex dynamics
+hidden_dim = 64 # Changed for experimental purposes, was not capturing midprice well
 num_features = 20 # See dataset.py
 seq_len = 50 # See dataset.py
 
-training_iterations = 5000
-batch_size = 64 # Decreased batch size to help generalisation
+training_iterations = 8000
+batch_size = 64
 
 
-# Introduce a learning rate scheduler
-initial_lr = 0.001
+initial_lr = 0.0003
 lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
     initial_learning_rate=initial_lr,
-    decay_steps=100, # Updates lr every 100 iterations
+    decay_steps=1000,      
     decay_rate=0.96,
-    staircase=True # Discrete jumps, instead of smooth decay
+    staircase=True
 )
 
 
@@ -95,25 +94,8 @@ for itt in range(training_iterations):
         price_loss  = mse_loss(X_mb_price, X_tilde_price)
         volume_loss = mse_loss(X_mb_volume, X_tilde_volume)
 
-        # Midprice
-        mid_orig = (X_mb_flat[:, 0] + X_mb_flat[:, 2]) / 2.0
-        mid_recon = (X_tilde_flat[:, 0] + X_tilde_flat[:, 2]) / 2.0
-
-        # Spread
-        spread_orig = X_mb_flat[:, 0] - X_mb_flat[:, 2]
-        spread_recon = X_tilde_flat[:, 0] - X_tilde_flat[:, 2]
-
-        # Returns 
-        returns_orig = mid_orig[1:] - mid_orig[:-1]
-        returns_recon = mid_recon[1:] - mid_recon[:-1]
-
-        # Final Loss Function
-        mid_loss = mse_loss(mid_orig, mid_recon)
-        spread_loss = mse_loss(spread_orig, spread_recon)
-        return_loss = mse_loss(returns_orig, returns_recon)
-
         # Weight for the midprice
-        loss = price_loss + volume_loss + 2.0*mid_loss + spread_loss + return_loss
+        loss = price_loss + volume_loss
 
     # ------------------- Backpropagation -------------------
     gradients = tape.gradient(loss, model.trainable_variables)
