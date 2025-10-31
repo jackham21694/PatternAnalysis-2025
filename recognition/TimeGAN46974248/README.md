@@ -40,3 +40,5 @@ https://bechirtr97.medium.com/enhancing-timegan-with-language-model-architecture
 https://www.jpmorgan.com/content/dam/jpm/cib/complex/content/technology/ai-research-publications/pdf-12.pdf
 https://www.tensorflow.org/guide/migrate#migrate-from-tensorflow-1x-to-tensorflow-2
 https://github.com/Jeonghwan-Cheon/lob-deep-learning
+https://arxiv.org/abs/1808.03668?utm_source=chatgpt.com
+https://link.springer.com/article/10.1007/s10462-024-10715-4?utm_source=chatgpt.com

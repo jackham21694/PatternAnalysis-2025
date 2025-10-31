@@ -20,58 +20,73 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-def data_loader(path, depth=5, num_features=20):
+def data_loader(path, num_features=20):
     # shape will be (entries) x (depth x 4)
-    raw_data = np.loadtxt(path, delimiter=',') 
+    raw_data = np.loadtxt(path, delimiter=',')
 
     # We choose a sequence length of 50, leave out 35 timesteps at the end
-    num_sequences = raw_data.shape[0] // 50 
+    num_sequences = raw_data.shape[0] // 50
     total_timesteps = num_sequences * 50
 
     # Discard the 35 letfover timesteps (35 for our lobster depth 5 data)
     trimmed_data = raw_data[:total_timesteps]
-    
-    # Custom Normalisation Process (MidPrice Averaging and Volume Z-Score)
-
-    # Need to sort data for each timestep into the four categories
-    ask_prices_idx = [i*4 for i in range(depth)]
-    ask_volumes_idx = [i*4 + 1 for i in range(depth)]
-    bid_prices_idx = [i*4 + 2 for i in range(depth)]
-    bid_volumes_idx = [i*4 + 3 for i in range(depth)]
-
-    # Midprice for each time step
-    midprice = (trimmed_data[:, ask_prices_idx[0]] + trimmed_data[:, bid_prices_idx[0]]) / 2
-
-    # Normalising all the prices for each time step using the respective midprice
-    for idx in ask_prices_idx + bid_prices_idx:
-        trimmed_data[:, idx] = (trimmed_data[:, idx] - midprice) / (midprice + 1e-8)
-
-    # Normalising the volumes (small addition in case sigma is 0)
-    for idx in ask_volumes_idx + bid_volumes_idx:
-            mu = trimmed_data[:, idx].mean()
-            sigma = trimmed_data[:, idx].std()
-            trimmed_data[:, idx] = (trimmed_data[:, idx] - mu) / (sigma + 1e-8)
-
-
     shaped_sample_data = trimmed_data.reshape((num_sequences, 50, num_features))
 
-    # Setting random seed and shuffling data
+    # Shuffle and prepare train, eval, test datasets
     np.random.seed(46974248)
     np.random.shuffle(shaped_sample_data)
 
     # Splits dataset so first 70% is train, 10% is eval, and last 10% is test.
-    train_end = int(0.7 * num_sequences)
-    eval_end  = int(0.8 * num_sequences)
+    train_end = int(0.7*num_sequences)
+    val_end  = int(0.8*num_sequences)
     train = shaped_sample_data[:train_end]
-    eval  = shaped_sample_data[train_end:eval_end]
-    test  = shaped_sample_data[eval_end:]
+    val  = shaped_sample_data[train_end:val_end]
+    test  = shaped_sample_data[val_end:]
+
+    # Indexes for prices and volumes
+    ask_prices_idx  = [i*4 for i in range(5)]
+    ask_volumes_idx = [i*4 + 1 for i in range(5)]
+    bid_prices_idx  = [i*4 + 2 for i in range(5)]
+    bid_volumes_idx = [i*4 + 3 for i in range(5)]
+
+    # Group prices and volume indices
+    price_idx = ask_prices_idx + bid_prices_idx
+    volume_idx = ask_volumes_idx + bid_volumes_idx
+
+    # Concatenate our train and validation sets (we use statistics for the 
+    # joint set)
+    train_val = np.vstack([train.reshape(-1, num_features),
+                           val.reshape(-1, num_features)])
+
+    # Price (small offset to avoid zero division)
+    price_mean = train_val[:, price_idx].mean(axis=0, keepdims=True)
+    price_std  = train_val[:, price_idx].std(axis=0, keepdims=True) + 1e-8
+
+    # Volume (small offset to avoid zero division)
+    volume_mean = train_val[:, volume_idx].mean(axis=0, keepdims=True)
+    volume_std  = train_val[:, volume_idx].std(axis=0, keepdims=True) + 1e-8
 
 
+    # Applied z-score normalisation
+    def normalise(data):
+        # Get rid of sequences so we can deal with each timestep
+        data_flat = data.reshape(-1, num_features)
+        
+        #Normalise prices and volumes seperately
+        data_flat[:, price_idx]  = (data_flat[:, price_idx] - price_mean) / price_std
+        data_flat[:, volume_idx] = (data_flat[:, volume_idx] - volume_mean) / volume_std
+        return data_flat.reshape(data.shape)
 
-    # Convert to 3D tensor of the form [num_sequences, sequence_length, num_features]
-    return (tf.convert_to_tensor(train, dtype=tf.float32),
-            tf.convert_to_tensor(eval, dtype=tf.float32),
-            tf.convert_to_tensor(test, dtype=tf.float32))
+    train_norm = normalise(train)
+    val_norm   = normalise(val)
+    test_norm  = normalise(test)
+
+    # We also return the statistics for reconstruction for our evaluation
+    return (tf.convert_to_tensor(train_norm, dtype=tf.float32),
+            tf.convert_to_tensor(val_norm, dtype=tf.float32),
+            tf.convert_to_tensor(test_norm, dtype=tf.float32),
+            price_mean, price_std, 
+            volume_mean, volume_std)
 
 
 
@@ -87,25 +102,34 @@ LOBSTER Data has three key indicators, being midprice, spread, and return.
 Here we will visualise 
 
 """
-def data_visualisation(data):
-    
-    # Our dataset has 1000 sequences with 50x20, meaning we have 50,000 timestamps in total
-    # First we reshape data so that it is 50,0000 x 20
-    flat = tf.reshape(data, (50000, 20))
-    
-    # Calculate the mid price for these samples
-    best_ask = flat[:,0] # Entire First Column
-    best_bid = flat[:,2] # Entire Third Column
-    midprices = (best_ask + best_bid) / 2.0
-    
-    # Calculate the spread for these samples
-    spreads = (best_ask- best_bid)
+def data_visualisation(X_orig, X_recon):
 
-    # Calculate the return (MidPrice Returns), no value last timestamp, since it is geometric
-    returns = midprices[1:] - midprices[:-1]
-    
+    # Flatten/Reshape data to get rid of sequences
+    X_orig_flat = tf.reshape(X_orig, (-1, X_orig.shape[-1]))
+    X_recon_flat = tf.reshape(X_recon, (-1, X_recon.shape[-1]))
+
+    # Calculate the mid price for these samples
+    best_ask_orig = X_orig_flat[:,0] # Entire First Column
+    best_bid_orig = X_orig_flat[:,2] # Entire Third Column
+    best_ask_recon = X_recon_flat[:,0] 
+    best_bid_recon = X_recon_flat[:,2] 
+
+    midprice_orig = (best_ask_orig + best_bid_orig) / 2.0
+    midprice_recon = (best_ask_recon + best_bid_recon) / 2.0
+
+    # Calculate the spread for these samples
+    spread_orig = (best_ask_orig- best_bid_orig)
+    spread_recon = (best_ask_recon - best_bid_recon)
+
+
+    # Calculate the return (MidPrice Returns), no value last 
+    # timestamp, since it is geometric
+    return_orig  = midprice_orig[1:] - midprice_orig[:-1]
+    return_recon = midprice_recon[1:] - midprice_recon[:-1]
+
     plt.figure(figsize=(16,4))
-    plt.plot(midprices.numpy(), color='blue')
+    plt.plot(midprice_orig.numpy(), color='blue')
+    plt.plot(midprice_recon.numpy(), label="Reconstructed", color='orange', linestyle='--')
     plt.title("Midprice")
     plt.xlabel("Time Steps")
     plt.ylabel("Midprice")
@@ -113,7 +137,8 @@ def data_visualisation(data):
     plt.show()
 
     plt.figure(figsize=(16,4))
-    plt.plot(spreads, color='green', linewidth=0.8)
+    plt.plot(spread_orig.numpy(), label="Original", color='green', linewidth=0.8)
+    plt.plot(spread_recon.numpy(), label="Reconstructed", color='red', linestyle='--', linewidth=0.8)
     plt.title("Spread")
     plt.xlabel("Time Steps")
     plt.ylabel("Spread")
@@ -121,10 +146,12 @@ def data_visualisation(data):
     plt.show()
 
     plt.figure(figsize=(16,4))
-    plt.plot(returns.numpy(), color='red', marker='o', markersize=2)
+    plt.plot(return_orig.numpy(), label="Original", color='blue', marker='o', markersize=2)
+    plt.plot(return_orig.numpy(), label="Reconstructed", color='orange', marker='x', markersize=2, linestyle='--')
+    plt.title("Return Comparison")
     plt.title("Return")
     plt.xlabel("Time Steps")
     plt.ylabel("Return")
     plt.grid(True)
     plt.show()
-    return midprices, spreads, returns
+    return midprice_orig, midprice_recon, spread_orig, spread_recon, return_orig, return_recon
