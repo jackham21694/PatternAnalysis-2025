@@ -96,14 +96,17 @@ batch_size = 64
 
 # Model Definitions
 autoencoder = Autoencoder(hidden_dim, num_layers, num_features)
-autoencoder.load_weights('autoencoder_weights.h5')
+autoencoder.load_weights('autoencoder.weights.h5')
 
-generator  = Generator(hidden_dim, num_layers)
 supervisor = Supervisor(hidden_dim, num_layers)
+generator  = Generator(hidden_dim, num_layers)
+discriminator = Discriminator(hidden_dim, num_layers)
+
 
 # Optimisers
-supervisor_optimiser = tf.keras.optimizers.Adam()
-generator_optimiser  = tf.keras.optimizers.Adam()
+supervisor_optimiser  = tf.keras.optimizers.Adam()
+generator_optimiser   = tf.keras.optimizers.Adam()
+autoencoder_optimiser = tf.keras.optimizers.Adam()
 
 # Data Loading
 file_path = '/content/drive/MyDrive/TimeGANWork/AMZN_2012-06-21_34200000_57600000_orderbook_5.csv'
@@ -147,3 +150,72 @@ for itt in range(training_iterations):
 
   if itt % 100 == 0:
         print(f"Step {itt}, Supervised Loss: {g_loss_s.numpy():.4f}")
+
+"""
+Joint Training
+
+The original paper for every training step, they train the generator twice
+then the discriminator, as to prevent the discriminator overpowering the 
+generator early (common for GAN training stabilisation). 
+
+"""
+
+for itt in range(training_iterations):
+  for i in range(2):
+    X_mb, _ = batch_generator(X_train, [seq_len]*len(X_train), batch_size)
+    X_mb = tf.convert_to_tensor(np.array(X_mb, dtype=np.float32))
+
+    # Random noise for our generator
+    Z_mb = random_generator(batch_size, hidden_dim, [50]*batch_size, 50)
+
+    with tf.GradientTape() as tape:
+      # Use generator to create synthetic embeddings from noise vector
+      H_hat = generator(Z_mb, training=True)
+
+      # Use the supervisor to predict time steps using synthetic data
+      S_hat = supervisor(H_hat, training=True)
+
+      # Use the recovery to convert synthetic data in the original feature space
+      X_hat = autoencoder.recovery(S_hat, training=True)
+
+      # Supervised Loss for our Generator
+      H_real = autoencoder.embed(X_mb)
+      H_supervised = supervisor(H_real)
+      supervised_generator_loss = tf.reduce_mean(tf.keras.losses.mse(H_real[:,1:,:], H_supervised[:,:-1,:]))
+
+
+      # Universal Loss for our Generator (Adversarial)
+      Y_fake   = discriminator(S_hat, training=True)
+      Y_fake_e = discriminator(H_hat, traing=True) 
+
+      bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+      G_loss_U = bce(tf.ones_like(Y_fake), Y_fake)
+      G_loss_U_e = bce(tf.ones_like(Y_fake_e), Y_fake_e)
+
+      # Additional Moment Loss for Generator (Helps stabilise Training)
+      mean_real, var_real = tf.nn.moments(X_mb, axes=[0, 1])
+      mean_hat, var_hat   = tf.nn.moments(X_hat, axes=[0, 1])
+      mean_loss = tf.reduce_mean(tf.abs(mean_real - mean_hat))
+      var_loss  = tf.reduce_mean(tf.abs(tf.sqrt(var_real + 1e-6) - tf.sqrt(var_hat + 1e-6)))
+
+
+      # Total Generator Loss (constants here taken from OG Paper)
+      G_loss = G_loss_U + G_loss_U_e + 100 * tf.sqrt(supervised_generator_loss) + 100 * (mean_loss + var_loss)
+    
+    # Apply gradients to both generator and supervisor
+    gradients_supervisor = tape.gradient(G_loss, supervisor.trainable_variables)
+    gradients_generator  = tape.gradient(G_loss, generator.trainable_variables)
+
+    supervisor_optimiser.apply_gradients(zip(gradients_supervisor, supervisor.trainable_variables))
+    generator_optimiser.apply_gradients(zip(gradients_generator, generator.trainable_variables))
+
+    # Embedder and Recovery Training
+    with tf.GradientTape() as tape_e:
+      X_tilde = autoencoder(X_mb, training=True)
+      E_loss_T0 = tf.reduce_mean(tf.keras.losses.mse(X_mb, X_tilde))
+      E_loss = 10 * tf.sqrt(E_loss_T0) + 0.1 * supervised_generator_loss
+
+    # Apply gradients to both embedder, and recovery
+    trainable_vars_e = autoencoder.trainable_variables
+    gradients_e = tape_e.gradient(E_loss, trainable_vars_e)
+    autoencoder_optimiser.apply_gradients(zip(gradients_e, trainable_vars_e))
