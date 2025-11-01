@@ -72,22 +72,10 @@ def data_loader(path, seq_len, depth):
     price_min  = train_val.min(axis=0, keepdims=True)
     price_max  = train_val.max(axis=0, keepdims=True)
 
-    # --- Normalisation function ---
-    def normalise(data):
-        data_flat = data.reshape(-1,  (depth*2))
-
-        # Min-max scale prices to [0, 1]
-        data_flat = (
-            (data_flat - price_min) /
-            (price_max - price_min + 1e-8)
-        )
-
-        return data_flat.reshape(data.shape)
-
     # Apply normalization
-    train_norm = normalise(train)
-    val_norm   = normalise(val)
-    test_norm  = normalise(test)
+    train_norm = normalise(train, depth, price_max, price_min)
+    val_norm   = normalise(val, depth, price_max, price_min)
+    test_norm  = normalise(test, depth, price_max, price_min)
 
     # Return tensors and scaling stats for reconstruction
     return (
@@ -97,35 +85,25 @@ def data_loader(path, seq_len, depth):
         price_min, price_max
     )
 
-def normalise(data, num_features, price_idx, volume_idx, price_max, price_min, volume_max, volume_min):
+def normalise(data, depth, price_max, price_min):
     """
     Normalises the given lobster data using min-max scaling, seperately for volume and price.
 
     Args:
         data: lobster data to be normalised
-        num_features: number of features for one timestep of lobster data
-        price_idx: list of indexes that represent prices in 'data'.
-        volume_idx: list of indexes that represent volumes in 'data'.
+        depth: depth of lobster data being used
         price_max, price_min: maximum and minimum price of 'data'.
-        volume_max, volume_min: maximum and minimum volume of 'data'.
-    
+
     Returns:
         Data scaled between 0 and 1.
     """
-    data_flat = data.reshape(-1, num_features)
+    data_flat = data.reshape(-1,  (depth*2))
 
     # Min-max scale prices to [0, 1]
-    data_flat[:, price_idx] = (
-        (data_flat[:, price_idx] - price_min) /
+    data_flat = (
+        (data_flat - price_min) /
         (price_max - price_min + 1e-8)
     )
-
-    # Min-max scale volumes to [0, 1]
-    data_flat[:, volume_idx] = (
-        (data_flat[:, volume_idx] - volume_min) /
-        (volume_max - volume_min + 1e-8)
-    )
-
     return data_flat.reshape(data.shape)
 
 def data_visualisation(X_orig, X_recon):
