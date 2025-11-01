@@ -5,7 +5,8 @@ losses and metrics during training.
 
 """
 from dataset import data_loader
-from modules import Autoencoder, Supervisor, Generator, Discriminator, random_generator, batch_generator
+from modules import Autoencoder, Supervisor, Generator, Discriminator
+from utils import random_generator, batch_generator
 import numpy as np
 import tensorflow as tf
 import os
@@ -47,7 +48,7 @@ print("Start Embedding Network Training")
 
 
 for itt in range(training_iterations):
-    X_mb, _ = batch_generator(X_train, [seq_len]*len(X_train), batch_size)
+    X_mb = batch_generator(X_train, [seq_len]*len(X_train), batch_size)
     X_mb = np.array(X_mb, dtype=np.float32)
 
     with tf.GradientTape() as tape:
@@ -129,7 +130,7 @@ dynamics learned by the supervisor. This will help stabilise training later.
 """
 for itt in range(training_iterations):
   # Generate our mini batch, and convert to numpy array
-  X_mb, _ = batch_generator(X_train, [seq_len]*len(X_train), batch_size)
+  X_mb = batch_generator(X_train, [seq_len]*len(X_train), batch_size)
   X_mb = np.array(X_mb, dtype=np.float32)
 
   with tf.GradientTape() as tape:
@@ -165,7 +166,7 @@ generator early (common for GAN training stabilisation).
 
 for itt in range(training_iterations):
   for i in range(2):
-    X_mb, _ = batch_generator(X_train, [seq_len]*len(X_train), batch_size)
+    X_mb = batch_generator(X_train, [seq_len]*len(X_train), batch_size)
     X_mb = tf.convert_to_tensor(np.array(X_mb, dtype=np.float32))
 
     # Random noise for our generator
@@ -231,7 +232,7 @@ for itt in range(training_iterations):
   is used inside the original paper.
   """
 
-  X_mb, _ = batch_generator(X_train, [seq_len]*len(X_train), batch_size)
+  X_mb = batch_generator(X_train, [seq_len]*len(X_train), batch_size)
   X_mb = tf.convert_to_tensor(np.array(X_mb, dtype=np.float32))
 
   # Random noise for our generator

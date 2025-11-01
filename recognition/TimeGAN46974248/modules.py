@@ -1,29 +1,25 @@
 """
-Contains the source code of the components of your model. Each component will be implemented as a class or a function.
+Module: modules.py
+Author: Jack Ham, 46974248
+
+Description
+-----------
+
+This modules contains the classes for our TimeGAN model, including
+the autoencoder, supervisor, generator, and discriminator. They are all
+built similarly with minor differences.
 
 """
 
 import tensorflow as tf
-import numpy as np
-
-def batch_generator(data, time, batch_size):
-    no = len(data)
-    idx = np.random.permutation(no)[:batch_size]
-    X_mb = np.array([data[i] for i in idx], dtype=np.float32)
-    T_mb = np.array([time[i] for i in idx], dtype=np.int32)
-    return X_mb, T_mb
-
-def random_generator (batch_size, z_dim, T_mb, max_seq_len):
-  Z_mb = list()
-  for i in range(batch_size):
-    temp = np.zeros([max_seq_len, z_dim])
-    temp_Z = np.random.uniform(0., 1, [T_mb[i], z_dim])
-    temp[:T_mb[i],:] = temp_Z
-    Z_mb.append(temp_Z)
-  return Z_mb
-
 
 class Autoencoder(tf.keras.Model):
+    """
+    Autoencoder class that has an embedder and recovery component that can be called
+    individually. The embedder stacks GRU recurrent networks to map the original data to a
+    latent space with dimension 'hidden_dim'. A fully connected layer with a sigmoid activation
+    function is also included as per the original TimeGAN paper.
+    """
     def __init__(self, hidden_dim, num_layers, num_features):
         super(Autoencoder, self).__init__()
         self.hidden_dim = hidden_dim
@@ -39,7 +35,7 @@ class Autoencoder(tf.keras.Model):
                                     name=f"embedder_gru_{i}")
             )
         self.embedder_dense = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.Dense(hidden_dim, activation=None)
+            tf.keras.layers.Dense(hidden_dim, activation='sigmoid')
         )
 
         # Build recovery layers
@@ -51,7 +47,7 @@ class Autoencoder(tf.keras.Model):
                                     name=f"recovery_gru_{i}")
             )
         self.recovery_dense = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.Dense(num_features, activation=None)
+            tf.keras.layers.Dense(num_features, activation='sigmoid')
         )
 
     def call(self, X):
@@ -74,12 +70,22 @@ class Autoencoder(tf.keras.Model):
         H = self.embedder_dense(H)
         return H
 
+    def recovery(self, H):
+        R = H
+        for gru in self.recovery_grus:
+            R = gru(R)
+        X_tilde = self.recovery_dense(R)
+        return X_tilde
 
 
 
 
-# Usually has one less layer then all the other components to keep it simple
+
 class Supervisor(tf.keras.Model):
+  """
+  Supervisor class that stacks GRU recurrent networks along with a fully connected layer.
+  Note that the number of layers is one less as per the original paper.
+  """
   def __init__(self, hidden_dim, num_layers):
         super(Supervisor, self).__init__()
         self.hidden_dim = hidden_dim
@@ -112,6 +118,9 @@ class Supervisor(tf.keras.Model):
 
 
 class Generator(tf.keras.Model):
+    """
+    Generator class that stacks GRU recurrent networks along with a fully connected layer.
+    """
     def __init__(self, hidden_dim, num_layers):
         super(Generator, self).__init__()
         self.hidden_dim = hidden_dim
@@ -144,6 +153,9 @@ class Generator(tf.keras.Model):
 
 
 class Discriminator(tf.keras.Model):
+    """
+    Discriminator class that stacks GRU recurrent networks along with a fully connected layer.
+    """
     def __init__(self, hidden_dim, num_layers):
         super(Discriminator, self).__init__()
         self.hidden_dim = hidden_dim

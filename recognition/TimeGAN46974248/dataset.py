@@ -1,18 +1,13 @@
 """
-Contains the data loader for loading and preprocessing your data
+Module: dataset.py
+Author: Jack Ham, 46974248
 
-"""
+Description
+-----------
 
-
-
-"""
-Information regarding the LOBSTER dataset. The structure of the LOBSTER dataset is as follows:
-
-A given sample or time step is of the structure [Ask Price 1, Ask Size 1, Bid Price 1, Bid Size 1, ...]
-and the length of one sample is depth x 4.
-
-The stucture of our data, expected by the TimeGAN is [num_sequences, sequence_length, num_features]
-where the whole trading day is split into sequeunces of a certain length.
+This module handles the data loading and preprocessing for a LOBSTER
+formatted dataset. It also include basic visualisation of common
+financial indicators midprice, spread, and return.
 
 """
 
@@ -21,6 +16,27 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 def data_loader(path, num_features=20):
+    """
+    This function takes a file path assuming to hold the traditional LOBSTER data format of
+    [ask_price_1, ask_size_1, bid_price_1, bid_size_1, ask_price_2, ask_size_2, bid_price_2, bid_size_2, ...]
+
+    Given a sequence length, it will shape the data into [number_sequences, sequence_length, num_features]
+    where it will best fit the given sequence length and discard the remaining timesteps. The number of 
+    features depends on the given depth (e.g. depth of 5: num_features = 4 * 5).
+
+    It splits the newly shaped data into training, validation and test sets, all normalised
+    using min-max scaling.
+
+    Args:
+        path: filepath of csv file
+        sequence_length: desired length of sequence
+        depth: the depth of the lobster data
+    
+    Returns:
+        A tensor for each training, validation, and testing datasets, as well as
+        meaningful statistics so the normalisation can be reverted if required.
+
+    """
     # shape will be (entries) x (depth x 4)
     raw_data = np.loadtxt(path, delimiter=',')
 
@@ -58,75 +74,91 @@ def data_loader(path, num_features=20):
     train_val = np.vstack([train.reshape(-1, num_features),
                            val.reshape(-1, num_features)])
 
-
-    # Price (we use min-max scaling here)
+    # Min Max Scaling for prices and volumes
     price_min = train_val[:, price_idx].min(axis=0, keepdims=True)
     price_max = train_val[:, price_idx].max(axis=0, keepdims=True)
+    volume_min = train_val[:, volume_idx].min(axis=0, keepdims=True)
+    volume_max = train_val[:, volume_idx].max(axis=0, keepdims=True)
 
+    # Apply normalization
+    train_norm = normalise(train, num_features, price_idx, volume_idx, price_max, price_min, volume_max, volume_min)
+    val_norm   = normalise(val, num_features, price_idx, volume_idx, price_max, price_min, volume_max, volume_min)
+    test_norm  = normalise(test, num_features, price_idx, volume_idx, price_max, price_min, volume_max, volume_min)
 
-    # Volume (small offset to avoid zero division)
-    volume_mean = train_val[:, volume_idx].mean(axis=0, keepdims=True)
-    volume_std  = train_val[:, volume_idx].std(axis=0, keepdims=True) + 1e-8
+    # Return tensors and scaling stats for reconstruction
+    return (
+        tf.convert_to_tensor(train_norm, dtype=tf.float32),
+        tf.convert_to_tensor(val_norm, dtype=tf.float32),
+        tf.convert_to_tensor(test_norm, dtype=tf.float32),
+        price_min, price_max,
+        volume_min, volume_max
+    )
 
-    # Applied z-score normalisation for volume, and min-max for prices
-    def normalise(data):
-        # Flatten sequences (get rid of) so we can deal with each timestep
-        data_flat = data.reshape(-1, num_features)
+def normalise(data, num_features, price_idx, volume_idx, price_max, price_min, volume_max, volume_min):
+    """
+    Normalises the given lobster data using min-max scaling, seperately for volume and price.
 
-        #Normalise prices, volumes seperately
+    Args:
+        data: lobster data to be normalised
+        num_features: number of features for one timestep of lobster data
+        price_idx: list of indexes that represent prices in 'data'.
+        volume_idx: list of indexes that represent volumes in 'data'.
+        price_max, price_min: maximum and minimum price of 'data'.
+        volume_max, volume_min: maximum and minimum volume of 'data'.
+    
+    Returns:
+        Data scaled between 0 and 1.
+    """
+    data_flat = data.reshape(-1, num_features)
 
-        data_flat[:, price_idx] = 2.0 * ((data_flat[:, price_idx] - price_min) /
-                                         (price_max - price_min + 1e-8)) - 1.0
-        data_flat[:, volume_idx] = (data_flat[:, volume_idx] - volume_mean) / volume_std
-        return data_flat.reshape(data.shape)
+    # Min-max scale prices to [0, 1]
+    data_flat[:, price_idx] = (
+        (data_flat[:, price_idx] - price_min) /
+        (price_max - price_min + 1e-8)
+    )
 
-    train_norm = normalise(train)
-    val_norm   = normalise(val)
-    test_norm  = normalise(test)
+    # Min-max scale volumes to [0, 1]
+    data_flat[:, volume_idx] = (
+        (data_flat[:, volume_idx] - volume_min) /
+        (volume_max - volume_min + 1e-8)
+    )
 
-    # We also return the statistics for reconstruction for our evaluation
-    return (tf.convert_to_tensor(train_norm, dtype=tf.float32),
-            tf.convert_to_tensor(val_norm, dtype=tf.float32),
-            tf.convert_to_tensor(test_norm, dtype=tf.float32),
-            price_min, price_max,
-            volume_mean, volume_std)
+    return data_flat.reshape(data.shape)
 
-
-
-
-
-
-
-
-
-"""
-LOBSTER Data has three key indicators, being midprice, spread, and return.
-
-Here we will visualise 
-
-"""
 def data_visualisation(X_orig, X_recon):
+    """
+    This function will plot the three financial indicators of midprice, spread, and return
+    for the original and reconstructed LOBSTER datasets.
+
+    Args:
+        X_orig:  lobster data shaped as [no_sequences, sequence_length, num_features]
+        X_recon: lobster data shaped as [no_sequences, sequence_length, num_features]
+    
+    Returns:
+        midprice, spread, and return for both original and reconstructed datasets.
+        
+    """
 
     # Flatten/Reshape data to get rid of sequences
     X_orig_flat = tf.reshape(X_orig, (-1, X_orig.shape[-1]))
     X_recon_flat = tf.reshape(X_recon, (-1, X_recon.shape[-1]))
 
-    # Calculate the mid price for these samples
+    # Obtain the best ask and bid prices 
     best_ask_orig = X_orig_flat[:,0] # Entire First Column
     best_bid_orig = X_orig_flat[:,2] # Entire Third Column
     best_ask_recon = X_recon_flat[:,0] 
     best_bid_recon = X_recon_flat[:,2] 
 
+    # Calculat the midprice
     midprice_orig = (best_ask_orig + best_bid_orig) / 2.0
     midprice_recon = (best_ask_recon + best_bid_recon) / 2.0
 
-    # Calculate the spread for these samples
+    # Calculate the spread 
     spread_orig = (best_ask_orig- best_bid_orig)
     spread_recon = (best_ask_recon - best_bid_recon)
 
 
-    # Calculate the return (MidPrice Returns), no value last 
-    # timestamp, since it is geometric
+    # Calculate the return no value last timestamp, since it is geometric
     return_orig  = midprice_orig[1:] - midprice_orig[:-1]
     return_recon = midprice_recon[1:] - midprice_recon[:-1]
 
