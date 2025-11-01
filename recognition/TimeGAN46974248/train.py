@@ -12,28 +12,27 @@ import tensorflow as tf
 import os
 
 
-file_path = '/content/drive/MyDrive/TimeGANWork/AMZN_2012-06-21_34200000_57600000_orderbook_5.csv'
-X_train, X_eval, X_test = data_loader(file_path)
+file_path = '/content/drive/MyDrive/TimeGANWork/AMZN_2012-06-21_34200000_57600000_orderbook_10.csv'
+X_train, X_eval, X_test, price_min, price_max = data_loader(file_path, 50, 10)
 X_train = X_train.numpy()
 X_eval = X_eval.numpy()
 X_test = X_test.numpy()
 
 
 # Define our hyperparamters
-num_layers = 2 # Almost every paper
-hidden_dim = 16 # Changed for experimental purposes, was not capturing midprice well
-num_features = 20 # See dataset.py
-seq_len = 50 # See dataset.py
+num_layers = 3
+hidden_dim = 64
+num_features = 20
+seq_len = 50
 
-training_iterations = 10000
-batch_size = 64
+training_iterations = 8000
+batch_size = 128
 
-
-initial_lr = 0.0003
+initial_lr = 0.0005
 lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
     initial_learning_rate=initial_lr,
-    decay_steps=1000,      
-    decay_rate=0.96,
+    decay_steps=2000,
+    decay_rate=0.95,
     staircase=True
 )
 
@@ -62,20 +61,15 @@ for itt in range(training_iterations):
         # Flatten sequences for loss computation: [timesteps, features]
         X_mb_flat = tf.reshape(X_mb, (-1, X_mb.shape[-1]))
         X_tilde_flat = tf.reshape(X_tilde, (-1, X_tilde.shape[-1]))
+        price_loss  = mse_loss(X_mb_flat, X_tilde_flat)
 
-        price_idx  = [0,2,4,6,8,10,12,14,16,18]  # ask + bid prices
-        volume_idx = [1,3,5,7,9,11,13,15,17,19]  # ask + bid volumes
+        # Variance preservation - PER FEATURE TYPE
+        var_price_real = tf.math.reduce_variance(X_mb_flat, axis=1)
+        var_price_recon = tf.math.reduce_variance(X_tilde_flat, axis=1)
+        var_price_loss = tf.reduce_mean(tf.abs(tf.sqrt(var_price_real + 1e-6) - tf.sqrt(var_price_recon + 1e-6)))
 
-        X_mb_price  = tf.gather(X_mb_flat, price_idx, axis=1)
-        X_mb_volume = tf.gather(X_mb_flat, volume_idx, axis=1)
-        X_tilde_price  = tf.gather(X_tilde_flat, price_idx, axis=1)
-        X_tilde_volume = tf.gather(X_tilde_flat, volume_idx, axis=1)
-
-        price_loss  = mse_loss(X_mb_price, X_tilde_price)
-        volume_loss = mse_loss(X_mb_volume, X_tilde_volume)
-
-        # Weight for the midprice
-        loss = price_loss + volume_loss
+        # Weighted combination of losses
+        loss = 10*tf.sqrt(price_loss) + 100*var_price_loss
 
     # ------------------- Backpropagation -------------------
     gradients = tape.gradient(loss, model.trainable_variables)
@@ -84,6 +78,7 @@ for itt in range(training_iterations):
     if itt % 100 == 0:
         print(f"step: {itt}/{training_iterations}, e_loss: {loss.numpy():.6f}")
 
+model.save_weights('/content/drive/MyDrive/autoencoder.weights.h5')
 print("Finish Embedding Network Training")
 
 

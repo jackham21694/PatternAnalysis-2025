@@ -15,7 +15,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-def data_loader(path, num_features=20):
+def data_loader(path, seq_len, depth):
     """
     This function takes a file path assuming to hold the traditional LOBSTER data format of
     [ask_price_1, ask_size_1, bid_price_1, bid_size_1, ask_price_2, ask_size_2, bid_price_2, bid_size_2, ...]
@@ -37,61 +37,64 @@ def data_loader(path, num_features=20):
         meaningful statistics so the normalisation can be reverted if required.
 
     """
-    # shape will be (entries) x (depth x 4)
+    # Load raw CSV data
     raw_data = np.loadtxt(path, delimiter=',')
 
-    # We choose a sequence length of 50, leave out 35 timesteps at the end
-    num_sequences = raw_data.shape[0] // 50
-    total_timesteps = num_sequences * 50
+    # Remove volumes values
+    volume_idx = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39]
+    raw_data = np.delete(raw_data, volume_idx, axis=1)
 
-    # Discard the 35 letfover timesteps (35 for our lobster depth 5 data)
+    # Define sequence length
+    num_sequences = raw_data.shape[0] // seq_len
+    total_timesteps = num_sequences * seq_len
+
+    # Trim leftover timesteps
     trimmed_data = raw_data[:total_timesteps]
-    shaped_sample_data = trimmed_data.reshape((num_sequences, 50, num_features))
+    shaped_sample_data = trimmed_data.reshape((num_sequences, seq_len, (depth*2)))
 
     # Shuffle and prepare train, eval, test datasets
     np.random.seed(46974248)
     np.random.shuffle(shaped_sample_data)
 
-    # Splits dataset so first 70% is train, 10% is eval, and last 10% is test.
-    train_end = int(0.7*num_sequences)
-    val_end  = int(0.8*num_sequences)
+    # Split 70/10/20
+    train_end = int(0.7 * num_sequences)
+    val_end   = int(0.8 * num_sequences)
+
     train = shaped_sample_data[:train_end]
-    val  = shaped_sample_data[train_end:val_end]
+    val   = shaped_sample_data[train_end:val_end]
     test  = shaped_sample_data[val_end:]
 
-    # Indexes for prices and volumes
-    ask_prices_idx  = [i*4 for i in range(5)]
-    ask_volumes_idx = [i*4 + 1 for i in range(5)]
-    bid_prices_idx  = [i*4 + 2 for i in range(5)]
-    bid_volumes_idx = [i*4 + 3 for i in range(5)]
+    # Combine train + val for statistics
+    train_val = np.vstack([train.reshape(-1,  (depth*2)),
+                           val.reshape(-1,  (depth*2))])
 
-    # Group prices and volume indices
-    price_idx = ask_prices_idx + bid_prices_idx
-    volume_idx = ask_volumes_idx + bid_volumes_idx
+    # --- Compute min/max for prices and volumes ---
+    price_min  = train_val.min(axis=0, keepdims=True)
+    price_max  = train_val.max(axis=0, keepdims=True)
 
-    # Concatenate our train and validation sets (we use statistics for the
-    # joint set)
-    train_val = np.vstack([train.reshape(-1, num_features),
-                           val.reshape(-1, num_features)])
+    # --- Normalisation function ---
+    def normalise(data):
+        data_flat = data.reshape(-1,  (depth*2))
 
-    # Min Max Scaling for prices and volumes
-    price_min = train_val[:, price_idx].min(axis=0, keepdims=True)
-    price_max = train_val[:, price_idx].max(axis=0, keepdims=True)
-    volume_min = train_val[:, volume_idx].min(axis=0, keepdims=True)
-    volume_max = train_val[:, volume_idx].max(axis=0, keepdims=True)
+        # Min-max scale prices to [0, 1]
+        data_flat = (
+            (data_flat - price_min) /
+            (price_max - price_min + 1e-8)
+        )
+
+        return data_flat.reshape(data.shape)
 
     # Apply normalization
-    train_norm = normalise(train, num_features, price_idx, volume_idx, price_max, price_min, volume_max, volume_min)
-    val_norm   = normalise(val, num_features, price_idx, volume_idx, price_max, price_min, volume_max, volume_min)
-    test_norm  = normalise(test, num_features, price_idx, volume_idx, price_max, price_min, volume_max, volume_min)
+    train_norm = normalise(train)
+    val_norm   = normalise(val)
+    test_norm  = normalise(test)
 
     # Return tensors and scaling stats for reconstruction
     return (
         tf.convert_to_tensor(train_norm, dtype=tf.float32),
         tf.convert_to_tensor(val_norm, dtype=tf.float32),
         tf.convert_to_tensor(test_norm, dtype=tf.float32),
-        price_min, price_max,
-        volume_min, volume_max
+        price_min, price_max
     )
 
 def normalise(data, num_features, price_idx, volume_idx, price_max, price_min, volume_max, volume_min):
@@ -145,9 +148,9 @@ def data_visualisation(X_orig, X_recon):
 
     # Obtain the best ask and bid prices 
     best_ask_orig = X_orig_flat[:,0] # Entire First Column
-    best_bid_orig = X_orig_flat[:,2] # Entire Third Column
+    best_bid_orig = X_orig_flat[:,1] # Entire Second Column
     best_ask_recon = X_recon_flat[:,0] 
-    best_bid_recon = X_recon_flat[:,2] 
+    best_bid_recon = X_recon_flat[:,1] 
 
     # Calculat the midprice
     midprice_orig = (best_ask_orig + best_bid_orig) / 2.0
