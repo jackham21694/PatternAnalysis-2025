@@ -5,7 +5,7 @@ losses and metrics during training.
 
 """
 from dataset import data_loader
-from modules import Autoencoder, batch_generator
+from modules import Autoencoder, Supervisor, Generator, Discriminator, random_generator, batch_generator
 import numpy as np
 import tensorflow as tf
 import os
@@ -86,17 +86,64 @@ for itt in range(training_iterations):
 print("Finish Embedding Network Training")
 
 
+#---------------------------------------------------------------------------SUPERVISOR/GENERATOR/DISCRIMINATOR TRAINING -------------------------------------------------------------
+hidden_dim = 16 # Same as embedder
+num_layers = 2
+num_features = 20
+
+training_iterations = 1000
+batch_size = 64
+
+# Model Definitions
+autoencoder = Autoencoder(hidden_dim, num_layers, num_features)
+autoencoder.load_weights('autoencoder_weights.h5')
+
+generator  = Generator(hidden_dim, num_layers)
+supervisor = Supervisor(hidden_dim, num_layers)
+
+# Optimisers
+supervisor_optimiser = tf.keras.optimizers.Adam()
+generator_optimiser  = tf.keras.optimizers.Adam()
+
+# Data Loading
+file_path = '/content/drive/MyDrive/TimeGANWork/AMZN_2012-06-21_34200000_57600000_orderbook_5.csv'
+X_train, X_eval, X_test, price_min, price_max, volume_mean, volume_std = data_loader(file_path)
+X_train = X_train.numpy()
+X_eval = X_eval.numpy()
+X_test = X_test.numpy()
+
+"""
+Supervised Loss Training
+
+The original paper trains the supervisior and generator together initially,
+purely so the generator is intialised with temporal knowledge before adversarial
+training. We want the generator to produce sequences that follow the latent
+dynamics learned by the supervisor. This will help stabilise training later.
+
+"""
+for itt in range(training_iterations):
+  # Generate our mini batch, and convert to numpy array
+  X_mb, _ = batch_generator(X_train, [seq_len]*len(X_train), batch_size)
+  X_mb = np.array(X_mb, dtype=np.float32)
+
+  with tf.GradientTape() as tape:
+    # Send batch through our pretrained embedder
+    H = autoencoder.embed(X_mb)
+
+    # Send new latent representation into supervisor to predict the next time
+    # steps (apart from last).
+    H_hat_supervise = supervisor(H)
+
+    # Compute our supervised loss
+    g_loss_s = tf.reduce_mean(tf.keras.losses.mse(H[:,1:,:], H_hat_supervise[:,:-1,:]))
+
+  # Adjust the trainable parameters for both the generator and supervisor
+  gradients_supervisor = tape.gradient(g_loss_s,  supervisor.trainable_variables)
+  gradients_generator  = tape.gradient(g_loss_s,  generator.trainable_variables)
+
+  supervisor_optimiser.apply_gradients(zip(gradients_supervisor, supervisor.trainable_variables))
+  generator_optimiser.apply_gradients(zip(gradients_generator, generator.trainable_variables))
 
 
-
-
-
-
-# Train the Generator and Discriminator
-#
-# Generator     - Produce Latent Sequences from Random Noise
-#               - Adversarial Loss (for now)
-#
-# Discriminator - Classify real and fake latent sequences
-#               - Cross-Entropy Loss between real/fake labels
-
+  if itt % 100 == 0:
+        print(f"Step {itt}, Supervised Loss: {g_loss_s.numpy():.4f}")
