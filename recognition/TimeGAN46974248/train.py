@@ -87,9 +87,11 @@ print("Finish Embedding Network Training")
 
 
 #---------------------------------------------------------------------------SUPERVISOR/GENERATOR/DISCRIMINATOR TRAINING -------------------------------------------------------------
-hidden_dim = 16 # Same as embedder
-num_layers = 2
+
+num_layers = 3
+hidden_dim = 32
 num_features = 20
+seq_len = 50
 
 training_iterations = 1000
 batch_size = 64
@@ -104,9 +106,10 @@ discriminator = Discriminator(hidden_dim, num_layers)
 
 
 # Optimisers
-supervisor_optimiser  = tf.keras.optimizers.Adam()
-generator_optimiser   = tf.keras.optimizers.Adam()
-autoencoder_optimiser = tf.keras.optimizers.Adam()
+supervisor_optimiser    = tf.keras.optimizers.Adam()
+generator_optimiser     = tf.keras.optimizers.Adam()
+autoencoder_optimiser   = tf.keras.optimizers.Adam()
+discriminator_optimiser = tf.keras.optimizers.Adam()
 
 # Data Loading
 file_path = '/content/drive/MyDrive/TimeGANWork/AMZN_2012-06-21_34200000_57600000_orderbook_5.csv'
@@ -186,7 +189,7 @@ for itt in range(training_iterations):
 
       # Universal Loss for our Generator (Adversarial)
       Y_fake   = discriminator(S_hat, training=True)
-      Y_fake_e = discriminator(H_hat, traing=True) 
+      Y_fake_e = discriminator(H_hat, training=True) 
 
       bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
       G_loss_U = bce(tf.ones_like(Y_fake), Y_fake)
@@ -219,3 +222,57 @@ for itt in range(training_iterations):
     trainable_vars_e = autoencoder.trainable_variables
     gradients_e = tape_e.gradient(E_loss, trainable_vars_e)
     autoencoder_optimiser.apply_gradients(zip(gradients_e, trainable_vars_e))
+  
+  """
+  Discriminator Training
+
+  Before training we check the current performance of the discriminator to
+  ensure it is not overperforming/overpowering our generator. The constant 0.15
+  is used inside the original paper.
+  """
+
+  X_mb, _ = batch_generator(X_train, [seq_len]*len(X_train), batch_size)
+  X_mb = tf.convert_to_tensor(np.array(X_mb, dtype=np.float32))
+
+  # Random noise for our generator
+  Z_mb = random_generator(batch_size, hidden_dim, [50]*batch_size, 50)
+
+  with tf.GradientTape() as tape_d_test:
+    # Fake Data
+    H_hat = generator(Z_mb, training=False)
+    S_hat = supervisor(H_hat, training=False)
+
+    # Real Data
+    H_real = autoencoder.embed(X_mb, training=False)
+
+    # Discriminator Results
+    Y_real = discriminator(H_real, training=False)
+    Y_fake = discriminator(S_hat, training=False)
+
+    # Calculate loss
+    D_loss = bce(tf.ones_like(Y_real), Y_real) + bce(tf.zeros_like(Y_fake), Y_fake)
+
+  if D_loss.numpy() > 0.15:
+    with tf.GradientTape() as tape_d:
+        H_hat = generator(Z_mb, training=True)
+        S_hat = supervisor(H_hat, training=True)
+        H_real = autoencoder.embed(X_mb, training=True)
+
+        Y_real = discriminator(H_real, training=True)
+        Y_fake = discriminator(S_hat, training=True)
+
+        D_loss = bce(tf.ones_like(Y_real), Y_real) + bce(tf.zeros_like(Y_fake), Y_fake)
+    
+    gradients_d = tape_d.gradient(D_loss, discriminator.trainable_variables)
+    discriminator_optimiser.apply_gradients(zip(gradients_d, discriminator.trainable_variables))
+    
+
+  if itt % 1000 == 0:
+      print(
+          f"step: {itt}/{training_iterations}, "
+          f"d_loss: {D_loss:.4f}, "
+          f"g_loss_u: {G_loss_U:.4f}, "
+          f"g_loss_s: {np.sqrt(supervised_generator_loss):.4f}, "
+          f"g_loss_v: {(mean_loss + var_loss):.4f}, "
+          f"e_loss_t0: {np.sqrt(E_loss_T0):.4f}"
+      )
