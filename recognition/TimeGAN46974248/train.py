@@ -7,6 +7,7 @@ losses and metrics during training.
 from dataset import data_loader
 from modules import Autoencoder, Supervisor, Generator, Discriminator
 from utils import random_generator, batch_generator
+from predict import reconstructed_indicators, evaluate_autoencoder
 import numpy as np
 import tensorflow as tf
 import os
@@ -261,10 +262,16 @@ lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
 # Pretraining  (do not need a return model, the weights are saved to a google drive folder)
 autoencoder_pretrain(hidden_dim, num_layers, num_features, lr_schedule, training_iterations, X_train, seq_len, batch_size)
 
-
 # Model Definitions (load saved autoencoder)
 autoencoder = Autoencoder(hidden_dim, num_layers, num_features)
 autoencoder.load_weights('autoencoder.weights.h5')
+
+# Financial Indicator Reconstruction Visualisation
+reconstructed_indicators(X_eval, autoencoder, price_min, price_max)
+
+reconstructed_indicators(X_train, autoencoder, price_min, price_max)
+
+evaluate_autoencoder(autoencoder, X_eval)
 
 supervisor = Supervisor(hidden_dim, num_layers)
 generator  = Generator(hidden_dim, num_layers)
@@ -289,3 +296,4 @@ autoencoder, supervisor, generator, discriminator = joint_training_loop(training
                                                                           autoencoder, supervisor, generator, discriminator, 
                                                                           supervisor_optimiser, generator_optimiser, autoencoder_optimiser, 
                                                                           discriminator_optimiser)
+

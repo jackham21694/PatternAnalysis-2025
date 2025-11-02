@@ -43,3 +43,15 @@ def random_generator (batch_size, hidden_dim, T_mb, max_seq_len):
     temp[:T_mb[i],:] = temp_Z
     Z_mb.append(temp_Z)
   return Z_mb
+
+
+
+def denormalise(X_norm, price_min, price_max):
+    # Flatten to 2D for easy scaling
+    X_flat = X_norm.reshape(-1, X_norm.shape[-1])
+
+    # Reverse min–max scaling for all features
+    X_flat = X_flat * (price_max - price_min) + price_min
+
+    # Reshape back to original
+    return X_flat.reshape(X_norm.shape)
