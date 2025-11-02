@@ -33,7 +33,7 @@ Discriminator: The discriminator also operates in the embedding space, and attem
                distinguish between real and fake data sequences. It is also built on
                3 stacked GRU layers with a fully connected layer.
 
-![TimeGAN Architecture Image]('recognition\TimeGAN46974248\assets\TimeGANArchitecture.jpg')
+![TimeGAN Architecture Image](assets/TimeGANArchitecture.jpg)
 
 
 
@@ -105,7 +105,7 @@ up (constant pulled from original paper).
 
 The supervisor loss is then used in both the generator and discriminator components to help our GAN with temporal dynamics.
 
-![TimeGAN Training Image]("recognition\TimeGAN46974248\assets\TimeGANTraining.jpg")
+![TimeGAN Training Image](assets/TimeGANTraining.jpg)
 
 
 
