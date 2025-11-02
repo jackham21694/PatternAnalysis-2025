@@ -33,13 +33,55 @@ Discriminator: The discriminator also operates in the embedding space, and attem
                distinguish between real and fake data sequences. It is also built on
                3 stacked GRU layers with a fully connected layer.
 
-![TimeGAN Architecture Image](recognition\TimeGAN46974248\assets\TimeGANArchitecture.jpg)
+![TimeGAN Architecture Image]('recognition\TimeGAN46974248\assets\TimeGANArchitecture.jpg')
+
+
+
+## Data Preprocessing
+
+We are using a LOBSTER formatted dataset for Amazon stock (level 10 depth), initially I tried mapping volume, 
+but soon realised this task is extreme, and instead cut volume and focused on price. Min-max scaling was used
+for normalisation as per the original paper, and numerous other resources. Z-score was also tested but min-
+max scaling managed to keep the shape of the data better. To avoid data leakage the min-max scaling was applied
+using the minimum maximum values for the combined training/validation data. This ensures that the test data does
+not contain future information, being the global min max values. Since we are operating with a single day of
+stock data, it was important to shuffle the dataset so there is equal representation in each dataset, for each
+part of the day.
 
 ## Training Process
 
+Opposed to traditional epoch training, the original paper uses a random batch generator focusing
+on generalisation. Seen in the 'utils.py' file, the batch generator allows repeat sequences, and
+does not guarantee that every sequence is seen, by randomly selecting via permutations. 
+
+The autoencoder is pretrained under reconstruction loss (supervised loss introduced later). As we 
+are trying to maintain the financial indicators midprice, and spread, I also included additional
+loss values for those specifically as well as a variance loss. Later on you will see the original
+paper uses a two moments loss to ensur the variance of a sequence is maintained. I also decided to
+use this in the autoencoder training, so that the embeddings did not 'stick to the mean'. A 
+hidden dimension of 64 and sequence length of 100 was the final choice (under 8000 iterations), 
+the original paper also did not opt for a bottleneck having more hidden_dimensions then the feature
+space as well. 
+
+The supervisor is also pretrained. The embedder is used on a batch of data, 
+it is then passed through our supervisor, and the predicted time steps are compared under mean
+squared error. Additionally, the generator's trainable variables are also nudged using the resulting
+gradients (as per the original paper). This ensures the generator is initialised with some temporal 
+knowledge before adversarial training. 
+
+Joint training is our final stage of training where the TimeGAN starts to take place. A random noise
+vector is inputted into the generator
+
+
+- weiner process
+
+
+
+
+
 The supervisor loss is then used in both the generator and discriminator components to help our GAN with temporal dynamics.
 
-![TimeGAN Training Image](recognition\TimeGAN46974248\assets\TimeGANTraining.jpg)
+![TimeGAN Training Image]("recognition\TimeGAN46974248\assets\TimeGANTraining.jpg")
 
 
 
