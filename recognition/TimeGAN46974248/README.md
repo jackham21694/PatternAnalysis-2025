@@ -1,12 +1,12 @@
-## TimeGAN for Synthetic LOBSTER Financial Data Generation
+# TimeGAN for Synthetic LOBSTER Financial Data Generation
 
-## Background
+# Background
 Generative Adverarial Networks have emerged as one of the more popular machine learning frameworks in recent years, given
 the increasing desire for generative AI, and synthetic data producttion. Popular networks such as the StyleGAN and widely reknowned
 transformers such as ChatGPT have taken the world by storm, but both have unique weakness when it comes to handling time-series data.
 Traditional GAN cannot capture the temporal dyamics of time-series data, and transformers are purely deterministic, not built for syntethic data generation. In 2020 a new model entered the atmosphere known as the TimeGAN, designed for synthetic data generation, focusing on temporal data dynamics, through the addition of supervised losses.
 
-## Algorithm Description and Architecture
+# Algorithm Description and Architecture
 
 TimeGAN is designed around the basic unsupervised GAN setup, with the addition of a supervisor loss as used in
 autoregressive models. There are 4 main components: Autoencoder, Supervisor, Generator,
@@ -37,7 +37,7 @@ Discriminator: The discriminator also operates in the embedding space, and attem
 
 
 
-## Data Preprocessing
+# Data Preprocessing
 
 We are using a LOBSTER formatted dataset for Amazon stock (level 10 depth), initially I tried mapping volume, 
 but soon realised this task is extreme, and instead cut volume and focused on price. Min-max scaling was used
@@ -48,7 +48,7 @@ not contain future information, being the global min max values. Since we are op
 stock data, it was important to shuffle the dataset so there is equal representation in each dataset, for each
 part of the day.
 
-## Training Process
+# Training Process
 
 Opposed to traditional epoch training, the original paper uses a random batch generator focusing
 on generalisation. Seen in the 'utils.py' file, the batch generator allows repeat sequences, and
@@ -72,7 +72,7 @@ knowledge before adversarial training.
 Joint training is our final stage of training where the TimeGAN starts to take place. As per figure b,
 each component has it's relevant losses. 
 
-# Generator
+## Generator
 The generator has a 'unsupervised loss' and a 'supervised loss'.
 A batch of data is embedded, and then ran through the supervisor, both of these latent embeddings make
 up the supervise loss. 
@@ -90,23 +90,77 @@ properties of the original batch (variance and mean).
 It should also be noted that this generator training occurs twice in each loop in an attempt to give
 the generator an advantage over the commonly overpowering discriminator.
 
-# Autoencoder
+## Autoencoder
 The embedder and recovery components are also included in the generator training loop, this time not
 just under the pretrained reconstruction loss, but is also introduced to the supervised loss.
 
 
-# Discriminator
+## Discriminator
 The discriminator is provided with a real sample and a synthetic example from the generator, and it's
 total loss function is the summation of the bce results for both samples. If the total discriminator
 loss drops below 0.15 then the training is skipped this iteration, as to allow the generator to catch
 up (constant pulled from original paper).
 
-
-
-The supervisor loss is then used in both the generator and discriminator components to help our GAN with temporal dynamics.
-
 ![TimeGAN Training Image](assets/TimeGANTraining.jpg)
 
+
+# Results and Visualisations (AutoEncoder)
+
+NOTE: All visualisation code was assisted by Claude.Ai
+
+
+![AutoEncoder Evaluation Statistics](assets/autoencoder_eval.jpg)
+
+Above are some meaningul statistics for our pre-trained autoencoder performance. I was particularly
+focused on variance preservation as the autoencoder tends to hug the mean of the sequence price
+instead of fitting the data.
+
+![AutoEncoder Evaluation Statistics](assets/autoencoderReconstruction.jpg)
+Above are the reconstructions for a randomly chosen sequence, showing the original and 
+reconstructed bid/ask prices. It shows the autoencoder is slowly learning the structure of
+the data and maintaining it's variance.
+
+![AutoEncoder Evaluation Statistics](assets/autoencoderMidprice.jpg)
+![AutoEncoder Evaluation Statistics](assets/autoencoderSpread.jpg)
+![AutoEncoder Evaluation Statistics](assets/autoencoderReturn.jpg)
+
+Above are the denormalised plots of the financial indicators, reconstructed by our autoencoder, 
+over the entire validation set. The midprice and return seem very reliable but the autoencoder
+has trouble mapping the spread feature.
+
+
+# Results and Visualisations (TimeGAN)
+
+
+
+
+
+
+# Discussion
+
+Unfortunately due to time constraints and computing restrictions the results of the TimeGAN are 
+neither a success or a failure, but incomplete. The autoencoder could only be trained for 8000
+iterations and the TimeGAN for 1000 iterations (2 hours), opposed to the original paper's 50,000 
+for both. Therefore it is hard to tell if my architecture is inherently flawed or if it just 
+was not given the time. Initially I planned to first train the TimeGAN with purely adversarial
+loss but only supervised assisted training was executed. 
+
+
+# Training Specifications (GPU, VRAM, etc.)
+
+Here are the approximate parameter counts assuming a hidden_dimension=64, num_layers=3, 
+num_features=20 for all architectures:
+
+Embedder: 70,016
+Recovery: 75,604
+Supervisor: 53,696
+Generator: 78,464
+Discriminator: 74,369
+
+TOTAL: 352, 149
+
+
+The entire project was created and trained using google colab's A100 GPU.
 
 
 ## Current Dependencies Required:
@@ -114,8 +168,10 @@ The supervisor loss is then used in both the generator and discriminator compone
 - numpy
 - tensorflow
 - scikit-learn 
-
-
+- os (colab usage)
+- drive (colab usage)
+- matplotlib
+- from scipy.stats import pearsonr
 
 ## References
 https://numpy.org/doc
@@ -132,5 +188,4 @@ https://www.jpmorgan.com/content/dam/jpm/cib/complex/content/technology/ai-resea
 https://www.tensorflow.org/guide/migrate#migrate-from-tensorflow-1x-to-tensorflow-2
 https://github.com/Jeonghwan-Cheon/lob-deep-learning
 https://arxiv.org/abs/1808.03668?utm_source=chatgpt.com
-
 https://link.springer.com/article/10.1007/s10462-024-10715-4?utm_source=chatgpt.com
