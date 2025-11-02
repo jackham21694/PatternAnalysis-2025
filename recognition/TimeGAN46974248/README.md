@@ -33,7 +33,7 @@ Discriminator: The discriminator also operates in the embedding space, and attem
                distinguish between real and fake data sequences. It is also built on
                3 stacked GRU layers with a fully connected layer.
 
-![TimeGAN Architecture Image](assets/TimeGANArchitecture.jpg)
+![TimeGAN Architecture Image](recognition/TimeGAN46974248/assets/TimeGANArchitecture.jpg)
 
 
 
@@ -105,7 +105,7 @@ up (constant pulled from original paper).
 
 The supervisor loss is then used in both the generator and discriminator components to help our GAN with temporal dynamics.
 
-![TimeGAN Training Image](assets/TimeGANTraining.jpg)
+![TimeGAN Training Image](recognition/TimeGAN46974248/assets/TimeGANTraining.jpg)
 
 
 
@@ -132,4 +132,5 @@ https://www.jpmorgan.com/content/dam/jpm/cib/complex/content/technology/ai-resea
 https://www.tensorflow.org/guide/migrate#migrate-from-tensorflow-1x-to-tensorflow-2
 https://github.com/Jeonghwan-Cheon/lob-deep-learning
 https://arxiv.org/abs/1808.03668?utm_source=chatgpt.com
+
 https://link.springer.com/article/10.1007/s10462-024-10715-4?utm_source=chatgpt.com
