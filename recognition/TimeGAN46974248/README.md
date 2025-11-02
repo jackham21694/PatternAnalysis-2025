@@ -69,13 +69,37 @@ squared error. Additionally, the generator's trainable variables are also nudged
 gradients (as per the original paper). This ensures the generator is initialised with some temporal 
 knowledge before adversarial training. 
 
-Joint training is our final stage of training where the TimeGAN starts to take place. A random noise
-vector is inputted into the generator
+Joint training is our final stage of training where the TimeGAN starts to take place. As per figure b,
+each component has it's relevant losses. 
+
+# Generator
+The generator has a 'unsupervised loss' and a 'supervised loss'.
+A batch of data is embedded, and then ran through the supervisor, both of these latent embeddings make
+up the supervise loss. 
+
+The process of calculating our unsupervised loss begins with a random noise vector being inputted into 
+the generator which then outputs a synthetic sample in the embedded space. This synthetic sample is 
+then parsed though the supervisor, and then the recovery component of the autoencoder. 
+
+We then seperately parse the synthetic embedding and the supervised synthetic embedding into the
+discriminator, and the summation of these two binary cross entropy losses make up the 
+generator's unsupervised loss. There is also an additional moment loss for the generator which
+is not shown in figure b, but mentioned in the paper. It is added to try and maintain the statistical
+properties of the original batch (variance and mean).
+
+It should also be noted that this generator training occurs twice in each loop in an attempt to give
+the generator an advantage over the commonly overpowering discriminator.
+
+# Autoencoder
+The embedder and recovery components are also included in the generator training loop, this time not
+just under the pretrained reconstruction loss, but is also introduced to the supervised loss.
 
 
-- weiner process
-
-
+# Discriminator
+The discriminator is provided with a real sample and a synthetic example from the generator, and it's
+total loss function is the summation of the bce results for both samples. If the total discriminator
+loss drops below 0.15 then the training is skipped this iteration, as to allow the generator to catch
+up (constant pulled from original paper).
 
 
 
