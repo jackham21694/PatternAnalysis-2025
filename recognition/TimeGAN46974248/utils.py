@@ -47,6 +47,10 @@ def random_generator (batch_size, hidden_dim, T_mb, max_seq_len):
 
 
 def denormalise(X_norm, price_min, price_max):
+    """
+    Denormalises a LOBSTER dataset, by reversing the min-max scaling
+    with the original minimum and maximum price.
+    """
     # Flatten to 2D for easy scaling
     X_flat = X_norm.reshape(-1, X_norm.shape[-1])
 

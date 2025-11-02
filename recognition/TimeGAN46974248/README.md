@@ -132,6 +132,20 @@ has trouble mapping the spread feature.
 # Results and Visualisations (TimeGAN)
 
 
+![GAN Evaluation Statistics](assets/ganTraining.jpg)
+![GAN Evaluation Statistics](assets/ganLateTraining.jpg)
+Here are some early and late results (late iterations are the second run with loaded weights, so 1000 iterations).
+Although very subpar, it should promising improvement in such a short time, but clearly the KL spread is really
+bad as alluded to in the autoencoder evaluation.
+
+
+
+![GAN Evaluation Statistics](assets/ganCompare1.jpg)
+![GAN Evaluation Statistics](assets/ganCompare2.jpg)
+![GAN Evaluation Statistics](assets/ganCompare3.jpg)
+![GAN Evaluation Statistics](assets/ganCompare4.jpg)
+![GAN Evaluation Statistics](assets/ganCompare5.jpg)
+Above are 5 heatmaps of our very undertrained TimeGAN.
 
 
 

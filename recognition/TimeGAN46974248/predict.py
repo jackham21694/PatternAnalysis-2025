@@ -1,21 +1,35 @@
 """
-Shows example usage of the trained model. Prints out results and provides visualisations.
+Module: predict.py
+Author: Jack Ham, 46974248
+
+Description
+-----------
+
+This modules contains all of the prediction/visualiation code, 
+that shows the performance and results of our autoencoder and
+generator. The evaluate_autoencoder function and the 
+generate_lob_heatmap_report are both AI developed visualisation
+functions.
 
 """
 
 import tensorflow as tf
 from dataset import data_visualisation
-from utils import denormalise, batch_generator
+from utils import denormalise, batch_generator, random_generator
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
+import os
+from skimage.metrics import structural_similarity as ssim
+from IPython.display import Image, display
+
 #-------------------------------------------------------------PREDICT.PY-----------------
 
 
-def reconstructed_indicators(data, autoencoder_model, price_min, price_max):
+def reconstructed_indicators(data, model, price_min, price_max):
     mse_loss = tf.keras.losses.MeanSquaredError()
 
-    X_reconstructed = autoencoder_model(data).numpy()
+    X_reconstructed = model(data).numpy()
 
     X_denorm = denormalise(data, price_min, price_max)
     X__recon_denorm = denormalise(X_reconstructed, price_min, price_max)
@@ -193,3 +207,98 @@ def evaluate_autoencoder(model, X_test, seq_len=100, batch_size=128):
     plt.show()
 
     return mse, corr, avg_var_ratio
+
+
+def generate_lob_heatmap_report(
+    generator, supervisor, autoencoder,
+    X_test,
+    hidden_dim=64, seq_len=100,
+    num_samples=5, save_dir='/content/heatmaps'
+):
+    """
+    Generates N (default 5) real vs synthetic LOB heatmaps with SSIM.
+    Saves PNGs + displays inline in Colab.
+    
+    Args:
+        generator, supervisor, autoencoder: Trained TimeGAN models
+        X_test: numpy array [n_test, seq_len, 20]
+        random_generator: your noise function
+        hidden_dim, seq_len: model hyperparameters
+        num_samples: how many pairs to generate
+        save_dir: where to save PNGs
+    """
+    os.makedirs(save_dir, exist_ok=True)
+
+    # ------------------------------------------------------------------
+    # 1. Helper: one synthetic snapshot
+    # ------------------------------------------------------------------
+    def one_synthetic():
+        Z = random_generator(1, hidden_dim, [seq_len], seq_len)
+        H = generator(Z, training=False)
+        S = supervisor(H, training=False)
+        X = autoencoder.recovery(S)
+        return X[0, 0, :].numpy()  # [20]
+
+    # ------------------------------------------------------------------
+    # 2. Heatmap from [20] → [10,2]
+    # ------------------------------------------------------------------
+    def to_heatmap(snap, relative=True):
+        ask, bid = snap[0:10], snap[10:20]
+        mid = (ask[0] + bid[0]) / 2.0
+        if relative:
+            bid = (bid - mid) / (mid + 1e-8)
+            ask = (ask - mid) / (mid + 1e-8)
+        return np.column_stack([bid[::-1], ask])  # best bid on top
+
+    # ------------------------------------------------------------------
+    # 3. SSIM with padding (10×2 → 10×7)
+    # ------------------------------------------------------------------
+    def calc_ssim(real_hm, synth_hm):
+        pad_r = np.pad(real_hm,  ((0,0), (0,5)), mode='reflect')
+        pad_s = np.pad(synth_hm, ((0,0), (0,5)), mode='reflect')
+        dr = pad_r.max() - pad_r.min() + 1e-8
+        return ssim(pad_r, pad_s, data_range=dr, win_size=7)
+
+    # ------------------------------------------------------------------
+    # 4. Plot + save + display one pair
+    # ------------------------------------------------------------------
+    def plot_pair(real_snap, synth_snap, idx):
+        real_hm  = to_heatmap(real_snap)
+        synth_hm = to_heatmap(synth_snap)
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+        im1 = ax1.imshow(real_hm,  cmap='viridis', aspect='auto')
+        ax1.set_title(f'Real LOB #{idx}'); ax1.set_xlabel('Side'); ax1.set_ylabel('Level')
+        plt.colorbar(im1, ax=ax1, label='Rel. price')
+
+        im2 = ax2.imshow(synth_hm, cmap='viridis', aspect='auto')
+        ax2.set_title(f'Synthetic LOB #{idx}'); ax2.set_xlabel('Side')
+        plt.colorbar(im2, ax=ax2, label='Rel. price')
+
+        s = calc_ssim(real_hm, synth_hm)
+        fig.suptitle(f'SSIM = {s:.4f}')
+        plt.tight_layout()
+
+        path = f'{save_dir}/lob_snapshot_{idx}.png'
+        plt.savefig(path, dpi=150, bbox_inches='tight')
+        plt.close()
+        return s, path
+
+    # ------------------------------------------------------------------
+    # 5. Main loop
+    # ------------------------------------------------------------------
+    real_flat = X_test.reshape(-1, 20)
+    indices = np.random.choice(len(real_flat), size=num_samples, replace=False)
+
+    ssim_list = []
+    for i, pos in enumerate(indices, 1):
+        real_snap  = real_flat[pos]
+        synth_snap = one_synthetic()
+        ssim_val, png_path = plot_pair(real_snap, synth_snap, i)
+        ssim_list.append(ssim_val)
+        print(f'Pair {i}: SSIM = {ssim_val:.4f}')
+        display(Image(png_path))
+
+    avg_ssim = np.mean(ssim_list)
+    print(f'\nAverage SSIM: {avg_ssim:.4f}')
+    return avg_ssim, ssim_list
