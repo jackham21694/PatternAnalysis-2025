@@ -179,27 +179,57 @@ The entire project was created and trained using google colab's A100 GPU.
 
 ## Current Dependencies Required:
 
-- numpy
-- tensorflow
-- scikit-learn 
-- os (colab usage)
-- drive (colab usage)
-- matplotlib
-- from scipy.stats import pearsonr
+- numpy==1.26.4
+- tensorflow==2.15.0
+- scikit-learn==1.4.2
+- matplotlib==3.8.2
+- scipy==1.12.0
 
-## References
-https://numpy.org/doc
+
+
+## References 
+
+NumPy Developers. (n.d.). *NumPy documentation*. https://numpy.org/doc
+
+TensorFlow Developers. (n.d.). *TensorFlow API documentation*. 
 https://www.tensorflow.org/api_docs/
-https://proceedings.neurips.cc/paper_files/paper/2019/file/c9efe5f26cd17ba6216bbe2a7d26d490-Paper.pdf
-https://github.com/jsyoon0823/TimeGAN
-https://lobsterdata.com/info/DataSamples.php
-https://ydata.ai/resources/synthetic-time-series-data-a-gan-approach
-https://notes.yeshiwei.com/_downloads/2ce792aff8596ea9453a9714f39d957a/Machine_Learning_for_Algorithmic_Trading_Predictive.pdf
-https://github.com/stefan-jansen/machine-learning-for-trading/tree/main
-https://repository.lib.fsu.edu/islandora/object/fsu:770676
-https://bechirtr97.medium.com/enhancing-timegan-with-language-model-architectures-autoregressive-transformers-and-positional-bc6a7024e047
-https://www.jpmorgan.com/content/dam/jpm/cib/complex/content/technology/ai-research-publications/pdf-12.pdf
+
+TensorFlow Developers. (n.d.). *Guide: Migration from TensorFlow 1.x to TensorFlow 2*. 
 https://www.tensorflow.org/guide/migrate#migrate-from-tensorflow-1x-to-tensorflow-2
+
+Yoon, J., Jarrett, D., & Van der Schaar, M. (2019). *Time-series Generative Adversarial Networks*. 
+Advances in Neural Information Processing Systems (NeurIPS). 
+https://proceedings.neurips.cc/paper_files/paper/2019/file/c9efe5f26cd17ba6216bbe2a7d26d490-Paper.pdf
+
+Oviedo, N. (2018). *[Title unknown]*. arXiv. https://arxiv.org/abs/1808.03668
+
+Springer Authors. (2024). *[Title unknown]*. Artificial Intelligence Review. 
+https://link.springer.com/article/10.1007/s10462-024-10715-4
+
+Florida State University. (2020). *[Thesis/Dissertation]*. 
+https://repository.lib.fsu.edu/islandora/object/fsu:770676
+
+LobsterData. (n.d.). *Sample data*. 
+https://lobsterdata.com/info/DataSamples.php
+
+J.P. Morgan AI Research. (n.d.). *[AI research publication]*. 
+https://www.jpmorgan.com/content/dam/jpm/cib/complex/content/technology/ai-research-publications/pdf-12.pdf
+
+Yoon, J. (2019). *TimeGAN* [GitHub repository]. 
+https://github.com/jsyoon0823/TimeGAN
+
+Cheon, J. (n.d.). *LOB deep learning* [GitHub repository]. 
 https://github.com/Jeonghwan-Cheon/lob-deep-learning
-https://arxiv.org/abs/1808.03668?utm_source=chatgpt.com
-https://link.springer.com/article/10.1007/s10462-024-10715-4?utm_source=chatgpt.com
+
+Jansen, S. (n.d.). *Machine learning for trading – supplementary code* [GitHub repository]. 
+https://github.com/stefan-jansen/machine-learning-for-trading/tree/main
+
+Ydata. (n.d.). *Synthetic time-series data: A GAN approach*. 
+https://ydata.ai/resources/synthetic-time-series-data-a-gan-approach
+
+Béchir, T. (2023). *Enhancing TimeGAN with language model architectures: Autoregressive transformers and positional encodings*. 
+https://bechirtr97.medium.com/enhancing-timegan-with-language-model-architectures-autoregressive-transformers-and-positional-bc6a7024e047
+
+Yeshiwei, M. (n.d.). *Machine learning for algorithmic trading – Notes*. 
+https://notes.yeshiwei.com/_downloads/2ce792aff8596ea9453a9714f39d957a/Machine_Learning_for_Algorithmic_Trading_Predictive.pdf
+
